@@ -1,5 +1,5 @@
 #!/bin/bash
 while :
 do
-filebrowser -p 8082 -c /etc/filebrowser/filebrowser.json
+filebrowser -p 8083 -c /etc/filebrowser/filebrowser.json
 done
