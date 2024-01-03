@@ -8,7 +8,6 @@ RUN curl https://cli-assets.heroku.com/install.sh | sh
 
 COPY . .
 COPY /web/filebrowser.json /etc/filebrowser/filebrowser.json
-COPY /web/qBittorrent.conf /qBittorrent/config/qBittorrent.conf
 
 RUN go mod init webui && go build -o bin/webui
 CMD webui
