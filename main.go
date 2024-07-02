@@ -7,27 +7,27 @@ import (
 )
 //FUNC Ttyd
 func ttyd() {
-        cmd := exec.Command("bash", "./script/ttyd.sh")
+        cmd := exec.Command("bash", "./script/ttyd.sh", "2>", "ttyd.log")
         cmd.Run()
 }
 //FUNC VS
 func vs() {
-        cmd := exec.Command("bash", "./script/vs.sh")
+        cmd := exec.Command("bash", "./script/vs.sh", "2>", "vs.log")
         cmd.Run()
 }
 //FUNC alist
 func alist() {
-        cmd := exec.Command("bash", "./script/alist.sh")
+        cmd := exec.Command("bash", "./script/alist.sh", "2>", "alist.log")
         cmd.Run()
 }
 //FUNC FB
 func fb() {
-        cmd := exec.Command("bash", "./script/fb.sh")
+        cmd := exec.Command("bash", "./script/fb.sh", "2>", "fb.log")
         cmd.Run()
 }
 //FUNC Web
 func web() {
-        cmd := exec.Command("bash", "./script/web.sh")
+        cmd := exec.Command("bash", "./script/web.sh", "2>", "web.log")
         cmd.Run()
 }
 func main() {
