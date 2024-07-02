@@ -15,6 +15,11 @@ func vs() {
         cmd := exec.Command("bash", "./script/vs.sh")
         cmd.Run()
 }
+//FUNC alist
+func alist() {
+        cmd := exec.Command("bash", "./script/alist.sh")
+        cmd.Run()
+}
 //FUNC FB
 func fb() {
         cmd := exec.Command("bash", "./script/fb.sh")
@@ -28,8 +33,9 @@ func web() {
 func main() {
         os.MkdirAll("./script", os.ModePerm)
         var wg sync.WaitGroup
-        wg.Add( 4 )
+        wg.Add( 5 )
         go vs()
+        go alist()
         go ttyd()
         go fb()
         go web()
