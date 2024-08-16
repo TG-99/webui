@@ -1,0 +1,23 @@
+{
+  "port": 8082,
+  "baseURL": "/filebrowser",
+  "address": "",
+  "log": "stdout",
+  "database": "/etc/filebrowser/filebrowser.db",
+  "root": "",
+  "noAuth": true,
+  "alternativeReCaptcha": false,
+  "reCaptchaKey": "",
+  "reCaptchaSecret": "",
+  "plugin": "",
+  "scope": "/var/www/files/",
+  "allowCommands": true,
+  "allowEdit": true,
+  "allowNew": true,
+  "commands": [
+    "git",
+    "svn",
+    "ls",
+    "wget"
+  ]
+}
