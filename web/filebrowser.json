@@ -1,5 +1,5 @@
 {
-  "port": 8082,
+  "port": 8081,
   "baseURL": "/filebrowser",
   "address": "",
   "log": "stdout",
