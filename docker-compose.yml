@@ -1,0 +1,18 @@
+services:
+  webui:
+    build: .
+    container_name: webui
+    restart: on-failure
+    ports:
+      - "${PORT}:${PORT}"
+      - "${FB_PORT}:${FB_PORT}"
+      - "${TTYD_PORT}:${TTYD_PORT}"
+      - "${ALIST_PORT}:${ALIST_PORT}"
+    env_file:
+      - .env
+    networks:
+      - proxy_network
+
+networks:
+  proxy_network:
+    external: true

@@ -16,20 +16,33 @@ server {
 		try_files $uri $uri/ =404;
 	}
 
-    location /downloads/ {
-        alias /home/;
+    location /files/ {
+        alias /;
         autoindex on;
     }
 	
-	location /vs/ {
-		proxy_pass http://localhost:8081/;
-        proxy_http_version 1.1;
-		proxy_set_header Upgrade $http_upgrade;
-		proxy_set_header Connection upgrade;
-		proxy_set_header Accept-Encoding gzip;
-        proxy_set_header Host $host;
+	location /alist/ {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-	}
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Range $http_range;
+        proxy_set_header If-Range $http_if_range;
+        proxy_redirect off;
+        proxy_pass http://localhost:5244/alist/;
+        # the max size of file to upload
+        client_max_body_size 20000m;
+    }
+
+    location /filebrowser/ {
+        client_max_body_size 2048M;
+        proxy_pass         http://localhost:8081;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade            $http_upgrade;
+        proxy_set_header   Connection         'upgrade';
+        proxy_set_header   Host               $host;
+        proxy_cache_bypass                    $http_upgrade;
+    }
 
     location /ttyd/ {
         proxy_pass http://localhost:8082/;
@@ -41,15 +54,4 @@ server {
         proxy_set_header   Connection         "upgrade";
         proxy_read_timeout 1d; # dont kill connection after 60s of inactivity
     }
-
-    location /filebrowser/ {
-        client_max_body_size 2048M;
-        proxy_pass         http://localhost:8083;
-        proxy_http_version 1.1;
-        proxy_set_header   Upgrade            $http_upgrade;
-        proxy_set_header   Connection         'upgrade';
-        proxy_set_header   Host               $host;
-        proxy_cache_bypass                    $http_upgrade;
-    }
-
 }
