@@ -5,6 +5,7 @@ services:
     restart: on-failure
     ports:
       - "${PORT}:${PORT}"
+      - "${VS_PORT}:${VS_PORT}"
       - "${FB_PORT}:${FB_PORT}"
       - "${TTYD_PORT}:${TTYD_PORT}"
       - "${ALIST_PORT}:${ALIST_PORT}"
