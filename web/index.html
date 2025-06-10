@@ -12,6 +12,19 @@
 
     <title>Friday</title>
 </head>
+<script>
+  let ngrokUrl = '';
+
+  fetch('/public_url.json')
+    .then(res => res.json())
+    .then(data => {
+      ngrokUrl = data.public_url;
+      document.getElementById('ngrok-url').textContent = data.public_url;
+    })
+    .catch(err => {
+      document.getElementById('ngrok-url').textContent = 'Failed to load Ngrok URL.';
+    });
+</script>
 
 <body>
 
@@ -87,6 +100,13 @@
                     <lottie-player src="https://lottie.host/c9264c8b-0507-43ea-b596-88c7b725f560/2CFVGTdecl.json" background="transparent" speed="2" loop autoplay></lottie-player>
                     <h3>Bash Terminal</h3>
                     <a href="/ttyd/" target="_blank" class="btn btn-danger">Bash Terminal</a>
+                </div>
+                <!-- Ngrok URL Section -->
+                <div class="container text-center text-light py-4">
+                    <h3>Ngrok Public URL</h3>
+                    <div class="d-flex justify-content-center align-items-center gap-3">
+                        <span id="ngrok-url" class="bg-dark text-success px-3 py-2 rounded" style="user-select: all;">Loading...</span>
+                    </div>
                 </div>
             </div>
         </div>
