@@ -1,13 +1,10 @@
-FROM rir18/mltb:latest
+FROM ubuntu:22.04
 
-ARG DEBIAN_FRONTEND=noninteractive
-RUN apt-get -y update && \
-	apt-get install -y golang ttyd zip bash
-RUN curl -fsSL https://raw.githubusercontent.com/filebrowser/get/master/get.sh | bash
-RUN curl https://cli-assets.heroku.com/install.sh | sh
+RUN apt-get update && apt-get install -y curl wget golang git ttyd nginx python3 python3-pip
+RUN pip3 install requests python-dotenv
 
 COPY . .
-COPY /web/filebrowser.json /etc/filebrowser/filebrowser.json
+RUN chmod +x ./script/nginx.sh ./script/xui.sh ./script/fb.sh ./script/ttyd.sh
 
 RUN go mod init webui && go build -o bin/webui
-CMD webui
+CMD ["./bin/webui"]

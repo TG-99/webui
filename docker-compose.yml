@@ -1,0 +1,12 @@
+services:
+  webui:
+    build: .
+    container_name: webui
+    restart: on-failure
+    ports:
+      - "${PORT}:${PORT}"
+      - "${XUI_PORT}:${XUI_PORT}"
+      - "${FB_PORT}:${FB_PORT}"
+      - "${TTYD_PORT}:${TTYD_PORT}"
+    env_file:
+      - .env
