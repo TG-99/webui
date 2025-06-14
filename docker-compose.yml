@@ -10,6 +10,5 @@ services:
       - "${TTYD_PORT}:${TTYD_PORT}"
       - "${ALIST_PORT}:${ALIST_PORT}"
       - "${SQUID_PORT}:${SQUID_PORT}"
-      - "${SQUID_PORT2}:${SQUID_PORT2}"
     env_file:
       - .env

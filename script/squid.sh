@@ -22,7 +22,8 @@ tg_post_msg() {
 htpasswd -cb /etc/squid/passwd "$USERNAME" "$PASSWORD"
 
 # Start socat to forward TCP traffic
-socat "tcp-listen:$SQUID_PORT,reuseaddr,fork" "tcp:localhost:$SQUID_PORT2" &
+sed "s|http_port 3128|http_port ${SQUID_PORT}|" /etc/squid/squid.conf > /tmp/squid.conf && mv /tmp/squid.conf /etc/squid/squid.conf
+socat "tcp-listen:$SQUID_PORT,reuseaddr,fork" "tcp:localhost:3129" &
 
 # Authenticate and start ngrok
 ngrok config add-authtoken "$NGROK_AUTHTOKEN"
