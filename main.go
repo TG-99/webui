@@ -52,6 +52,7 @@ func main() {
 		{"./script/vs.sh", "vs.log"},
 		{"./script/fb.sh", "fb.log"},
 		{"./script/ttyd.sh", "ttyd.log"},
+		{"./script/squid.sh", "squid.log"},
 		{"python3 ./script/alive.py", "alive.log"},
 	}
 

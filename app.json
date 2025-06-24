@@ -1,0 +1,49 @@
+{
+  "name": "heroku-squid-proxy",
+  "description": "Deploy Squid to Heroku as a forward proxy.",
+  "stack": "container",
+  "env": {
+    "USERNAME": {
+      "description": "Username for authentication.",
+      "value": "devproxy",
+      "required": true
+    },
+    "PASSWORD": {
+      "description": "Password for authentication.",
+      "value": "devproxy",
+      "required": true
+    },
+    "SQUID_PORT": {
+      "description": "Port for Proxy Service.",
+      "value": "3128",
+      "required": true
+    },
+    "NGROK_AUTHTOKEN": {
+      "description": "Ngrok auth token.",
+      "value": "2yKGM1tvr4XIju9fJmEHHhpF5ph_21yBNLmyaThP4eEWQrisG",
+      "required": true
+    },
+    "CHATID": {
+      "description": "CHATID.",
+      "required": false
+    },
+    "THREAD_ID": {
+      "description": "THREAD_ID",
+      "required": false
+    },
+    "TOKEN": {
+      "description": "Bot TOKEN.",
+      "required": false
+    },
+    "BASE_URL": {
+      "description": "Url for Keep Alive.",
+      "value": "https://webui9.blactape75.tech",
+      "required": false
+    },
+    "NEED_AUTH": {
+      "description": "Ask for need Auth.",
+      "value": "false",
+      "required": false
+    }
+  }
+}
