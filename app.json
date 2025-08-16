@@ -1,0 +1,17 @@
+{
+  "name": "heroku-squid-proxy",
+  "description": "Deploy Squid to Heroku as a forward proxy.",
+  "stack": "container",
+  "env": {
+    "BASE_URL": {
+      "description": "Url for Keep Alive.",
+      "value": "https://webui9.blacktape.ggff.net",
+      "required": false
+    },
+    "NEED_AUTH": {
+      "description": "Ask for need Auth.",
+      "value": "false",
+      "required": false
+    }
+  }
+}
