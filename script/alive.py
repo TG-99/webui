@@ -23,7 +23,7 @@ if BASE_URL_PORT is not None and BASE_URL is not None:
             response = rget(BASE_URL)
             response.raise_for_status()  # Raise an exception for bad status codes
             print("Done")
-            sleep(600)
+            sleep(300)
         except Exception as e:
             if not connection_failed:  # Log error only on the first failure
                 logerror(f"alive.py: Failed to connect.")
