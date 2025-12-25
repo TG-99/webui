@@ -50,7 +50,6 @@ func main() {
 		{"./script/nginx.sh", "nginx.log"},
 		{"./script/alist.sh", "alist.log"},
 		{"./script/vs.sh", "vs.log"},
-		{"./script/fb.sh", "fb.log"},
 		{"./script/ttyd.sh", "ttyd.log"},
 		{"python3 ./script/alive.py", "alive.log"},
 	}
