@@ -1,13 +1,21 @@
-FROM rir18/mltb:latest
+FROM ubuntu:22.04
 
-ARG DEBIAN_FRONTEND=noninteractive
-RUN apt-get -y update && \
-	apt-get install -y golang ttyd zip bash
-RUN curl -fsSL https://raw.githubusercontent.com/filebrowser/get/master/get.sh | bash
-RUN curl https://cli-assets.heroku.com/install.sh | sh
+ENV DEBIAN_FRONTEND=noninteractive
 
-COPY . .
-COPY /web/filebrowser.json /etc/filebrowser/filebrowser.json
+RUN apt-get update && \
+    apt-get install -y mysql-server nginx supervisor && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN go mod init webui && go build -o bin/webui
-CMD webui
+# Configure MySQL to listen on all interfaces
+RUN sed -i "s/^bind-address\s*=.*/bind-address = 0.0.0.0/" /etc/mysql/mysql.conf.d/mysqld.cnf
+
+COPY nginx_config /etc/nginx/sites-available/default
+COPY web /usr/share/nginx/html
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY .env /root/.env
+COPY init_mysql.sh /root/init_mysql.sh
+RUN chmod +x /root/init_mysql.sh
+
+EXPOSE 8080 3306
+
+CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

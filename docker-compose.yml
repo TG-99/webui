@@ -1,0 +1,10 @@
+services:
+  database:
+    build: .
+    container_name: database
+    restart: on-failure
+    ports:
+      - "${PORT}:${PORT}"
+      - 3306:3306
+    env_file:
+      - .env

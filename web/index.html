@@ -12,6 +12,19 @@
 
     <title>Friday</title>
 </head>
+<script>
+  let ngrokUrl = '';
+
+  fetch('/public_url.json')
+    .then(res => res.json())
+    .then(data => {
+      ngrokUrl = data.public_url;
+      document.getElementById('ngrok-url').textContent = data.public_url;
+    })
+    .catch(err => {
+      document.getElementById('ngrok-url').textContent = 'Failed to load Ngrok URL.';
+    });
+</script>
 
 <body>
 
@@ -69,46 +82,39 @@
         <div class="container py-5">
             <div class="row align-items-end text-center">
                 <div class="col-md-3 p-5">
-                    <lottie-player src="https://assets6.lottiefiles.com/packages/lf20_xafe7wbh.json" background="transparent" speed="3" loop  autoplay></lottie-player>
-                    <h3>Web Bash Terminal</h3>
-                    <a href="/ttyd/" target="_blank" class="btn btn-danger">ttyd Terminal</a>
+                    <lottie-player src="https://lottie.host/024908be-8bd1-48a4-b15e-276264e3ad22/yPa0I7BVTy.json" background="transparent" speed="1" loop autoplay></lottie-player>
+                    <h3>Alist</h3>
+                    <a href="/alist/" target="_blank" class="btn btn-danger">Alist Index</a>
                 </div>
                 <div class="col-md-3 p-5">
-                    <lottie-player src="https://assets7.lottiefiles.com/packages/lf20_a38jz3gj.json" background="transparent" speed="1" loop  autoplay></lottie-player>
-                    <h3>Direct Download</h3>
-                    <a href="/downloads/" target="_blank" class="btn btn-danger">Download Folder</a>
+                    <lottie-player src="https://lottie.host/ad6e89cf-7183-4d4c-b372-6838d0e1532d/3xCRUwft60.json" background="transparent" speed="2" loop autoplay></lottie-player>
+                    <h3>Code Server</h3>
+                    <a href="/vs/" target="_blank" class="btn btn-danger">Code Server</a>
                 </div>
                 <div class="col-md-3 p-5">
-                    <lottie-player src="https://assets8.lottiefiles.com/packages/lf20_ABViugg18Y.json" background="transparent" speed="1" loop autoplay></lottie-player>
+                    <lottie-player src="https://assets8.lottiefiles.com/packages/lf20_FoOt6KVFcG.json" background="transparent" speed="1" loop autoplay></lottie-player>
                     <h3>Web File Browser</h3>
-                    <a href="/filebrowser/" target="_blank" class="btn btn-danger">File Browser</a>
+                    <a href="/filebrowser/" target="_blank" class="btn btn-danger">Web File Browser</a>
                 </div>
                 <div class="col-md-3 p-5">
-                    <lottie-player src="https://assets6.lottiefiles.com/packages/lf20_FoOt6KVFcG.json" background="transparent" speed="3" loop autoplay></lottie-player>
-                    <h3>CodeServer(Cloud)</h3>
-                    <a href="/vs/" target="_blank" class="btn btn-danger">CodeServer</a>
+                    <lottie-player src="https://lottie.host/c9264c8b-0507-43ea-b596-88c7b725f560/2CFVGTdecl.json" background="transparent" speed="2" loop autoplay></lottie-player>
+                    <h3>Bash Terminal</h3>
+                    <a href="/ttyd/" target="_blank" class="btn btn-danger">Bash Terminal</a>
+                </div>
+                <!-- Ngrok URL Section -->
+                <div class="container text-center text-light py-4">
+                    <h3>Ngrok Public URL</h3>
+                    <div class="d-flex justify-content-center align-items-center gap-3">
+                        <span id="ngrok-url" class="bg-dark text-success px-3 py-2 rounded" style="user-select: all;">Loading...</span>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
     <!-- About -->
 
-
-
-
-
-
-    <!-- Optional JavaScript; choose one of the two! -->
-
     <!-- Option 1: Bootstrap Bundle with Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-p34f1UUtsS3wqzfto5wAAmdvj+osOnFyQFpp4Ua3gs/ZVWx6oOypYoCJhGGScy+8" crossorigin="anonymous"></script>
-
-    <!-- Option 2: Separate Popper and Bootstrap JS -->
-    <!--
-    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js" integrity="sha384-IQsoLXl5PILFhosVNubq5LC7Qb9DXgDA9i+tQ8Zj3iwWAwPtgFTxbJ8NT4GN1R8p" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0/dist/js/bootstrap.min.js" integrity="sha384-lpyLfhYuitXl2zRZ5Bn2fqnhNAKOAaM/0Kr9laMspuaMiZfGmfwRNFh8HlMy49eQ" crossorigin="anonymous"></script>
-    -->
-
     <!-- For Lottie -->
     <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
 </body>
