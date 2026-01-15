@@ -47,12 +47,11 @@ func main() {
 		command string
 		logFile string
 	}{
-		{"./script/nginx.sh", "nginx.log"},
-		{"./script/alist.sh", "alist.log"},
-		{"./script/vs.sh", "vs.log"},
-		{"./script/fb.sh", "fb.log"},
-		{"./script/ttyd.sh", "ttyd.log"},
-		{"python3 ./script/alive.py", "alive.log"},
+		{"./script/nginx.sh", "nginx.txt"},
+		{"./script/alist.sh", "alist.txt"},
+		{"./script/vs.sh", "vs.txt"},
+		{"./script/ttyd.sh", "ttyd.txt"},
+		{"python3 ./script/alive.py", "alive.txt"},
 	}
 
 	// Launch each command concurrently

@@ -6,14 +6,14 @@ services:
     ports:
       - "${PORT}:${PORT}"
       - "${VS_PORT}:${VS_PORT}"
-      - "${FB_PORT}:${FB_PORT}"
       - "${TTYD_PORT}:${TTYD_PORT}"
       - "${ALIST_PORT}:${ALIST_PORT}"
     env_file:
       - .env
-    networks:
-      - proxy_network
+    # network_mode: "host"
+    # networks:
+    #   - proxy_network
 
-networks:
-  proxy_network:
-    external: true
+# networks:
+#   proxy_network:
+#     external: true
