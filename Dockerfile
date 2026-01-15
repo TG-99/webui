@@ -20,8 +20,8 @@ RUN ARCH=$(uname -m) && \
     # Download and extract Code-Server
     wget https://github.com/coder/code-server/releases/download/v4.107.0/code-server-4.107.0-linux-$URL_ARCH.tar.gz && \
     tar -xzf code-server*.tar.gz && \
-    mv /usr/lib/code-server-4.107.0-linux-$URL_ARCH /usr/lib/code-server && \
-    ln -s /usr/lib/code-server/bin/code-server /usr/local/bin/code-server && \
+    cp -r code-server-4.107.0-linux-$URL_ARCH /usr/lib/code-server && \
+    ln -s /usr/lib/code-server/bin/code-server /bin/code-server && \
     rm code-server*.tar.gz
 
 RUN curl https://cli-assets.heroku.com/install.sh | sh
