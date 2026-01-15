@@ -24,7 +24,7 @@ RUN ARCH=$(uname -m) && \
     ln -s /usr/lib/code-server/bin/code-server /bin/code-server && \
     rm code-server*.tar.gz
 
-RUN curl https://cli-assets.heroku.com/install.sh | sh
+#RUN curl https://cli-assets.heroku.com/install.sh | sh
 
 RUN pip3 install requests python-dotenv
 
