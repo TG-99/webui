@@ -6,9 +6,32 @@ ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get -y update && apt-get install -y bash wget curl golang git ttyd nginx python3 python3-pip \
     && apt-get -y autoremove && apt-get -y autoclean
 
-RUN wget https://github.com/alist-org/alist/releases/latest/download/alist-linux-amd64.tar.gz \
-    && tar -xzvf alist*.tar.gz \
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" = "x86_64" ]; then \
+        URL="https://github.com/alist-org/alist/releases/latest/download/alist-linux-amd64.tar.gz"; \
+    elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
+        URL="https://github.com/alist-org/alist/releases/latest/download/alist-linux-arm64.tar.gz"; \
+    else \
+        echo "Unsupported architecture: $ARCH" && exit 1; \
+    fi && \
+    wget -O alist.tar.gz "$URL" \
+    && tar -xzvf alist.tar.gz \
     && rm -r alist*.tar.gz
+
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" = "x86_64" ]; then \
+        URL="https://github.com/coder/code-server/releases/download/v4.107.0/code-server-4.107.0-linux-amd64.tar.gz"; \
+    elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
+        URL="https://github.com/coder/code-server/releases/download/v4.107.0/code-server-4.107.0-linux-arm64.tar.gz"; \
+    else \
+        echo "Unsupported architecture: $ARCH" && exit 1; \
+    fi && \
+    wget -O code-server.tar.gz "$URL" \
+    && tar -xzvf code-server.tar.gz \
+    && cp -r code-server /usr/lib/code-server \
+    && ln -s /usr/lib/code-server/bin/code-server /bin/code-server \
+    && rm -r code-server*.tar.gz
+
 RUN curl https://cli-assets.heroku.com/install.sh | sh
 
 RUN pip3 install requests python-dotenv
