@@ -8,29 +8,21 @@ RUN apt-get -y update && apt-get install -y bash wget curl golang git ttyd nginx
 
 RUN ARCH=$(uname -m) && \
     if [ "$ARCH" = "x86_64" ]; then \
-        URL="https://github.com/alist-org/alist/releases/latest/download/alist-linux-amd64.tar.gz"; \
+        URL_ARCH="amd64"; \
     elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
-        URL="https://github.com/alist-org/alist/releases/latest/download/alist-linux-arm64.tar.gz"; \
+        URL_ARCH="arm64"; \
     else \
         echo "Unsupported architecture: $ARCH" && exit 1; \
     fi && \
-    wget -O alist.tar.gz "$URL" \
-    && tar -xzvf alist.tar.gz \
-    && rm -r alist*.tar.gz
-
-RUN ARCH=$(uname -m) && \
-    if [ "$ARCH" = "x86_64" ]; then \
-        URL="https://github.com/coder/code-server/releases/download/v4.107.0/code-server-4.107.0-linux-amd64.tar.gz"; \
-    elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
-        URL="https://github.com/coder/code-server/releases/download/v4.107.0/code-server-4.107.0-linux-arm64.tar.gz"; \
-    else \
-        echo "Unsupported architecture: $ARCH" && exit 1; \
-    fi && \
-    wget -O code-server.tar.gz "$URL" \
-    && tar -xzvf code-server.tar.gz \
-    && cp -r code-server /usr/lib/code-server \
-    && ln -s /usr/lib/code-server/bin/code-server /bin/code-server \
-    && rm -r code-server*.tar.gz
+    wget https://github.com/alist-org/alist/releases/latest/download/alist-linux-$URL_ARCH.tar.gz && \
+    tar -xzvf alist*.tar.gz && \
+    rm -r alist*.tar.gz && \
+    # Download and extract Code-Server
+    wget https://github.com/coder/code-server/releases/download/v4.107.0/code-server-4.107.0-linux-$URL_ARCH.tar.gz && \
+    tar -xzf code-server*.tar.gz && \
+    mv /usr/lib/code-server-4.107.0-linux-$URL_ARCH /usr/lib/code-server && \
+    ln -s /usr/lib/code-server/bin/code-server /usr/local/bin/code-server && \
+    rm code-server*.tar.gz
 
 RUN curl https://cli-assets.heroku.com/install.sh | sh
 
