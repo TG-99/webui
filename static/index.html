@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Stunning modern Keep-Alive Manager to prevent Render, Koyeb, Glitch, and other free hosting platforms from sleeping.">
+    <title>Keep-Alive Manager | Modern Status Dashboard</title>
+    <!-- DNS prefetch & preconnect for external resources -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+    <!-- Google Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+
+<body>
+    <!-- Radial Glowing Mesh Backgrounds -->
+    <div class="mesh-glow bg-glow-1"></div>
+    <div class="mesh-glow bg-glow-2"></div>
+    <div class="mesh-glow bg-glow-3"></div>
+
+    <div class="app-container">
+        <!-- Sidebar or Header -->
+        <header class="app-header">
+            <div class="logo-container">
+                <div class="logo-glow"></div>
+                <div class="logo-icon">
+                    <i class="fa-solid fa-satellite-dish animated-signal"></i>
+                </div>
+                <div class="logo-text">
+                    <h1>ALIVE & DB</h1>
+                    <span>Alive Status & DB Dashboard</span>
+                </div>
+            </div>
+
+            <nav class="app-tabs-nav" aria-label="Main Navigation">
+                <button class="tab-btn active" data-tab="alive" type="button">
+                    <i class="fa-solid fa-chart-line"></i> Keep-Alive
+                </button>
+                <button class="tab-btn" data-tab="db" type="button">
+                    <i class="fa-solid fa-database"></i> DB Explorer
+                </button>
+            </nav>
+
+            <div class="header-actions">
+                <div class="theme-switcher-global" id="theme-switcher">
+                    <button class="theme-toggle-btn active" data-theme="system" title="System Default"
+                        aria-label="System Default Theme">
+                        <i class="fa-solid fa-desktop"></i>
+                    </button>
+                    <button class="theme-toggle-btn" data-theme="light" title="Light Mode" aria-label="Light Theme">
+                        <i class="fa-solid fa-sun"></i>
+                    </button>
+                    <button class="theme-toggle-btn" data-theme="dark" title="Dark Mode" aria-label="Dark Theme">
+                        <i class="fa-solid fa-moon"></i>
+                    </button>
+                </div>
+                <button id="add-target-btn-header" class="btn btn-primary" onclick="openAddModal()">
+                    <i class="fa-solid fa-plus"></i> Add Link
+                </button>
+            </div>
+        </header>
+
+        <!-- Keep-Alive Tab Content -->
+        <div id="alive-tab-content" class="tab-content active">
+            <!-- Global Dashboard Statistics Overview -->
+            <section class="stats-overview" aria-label="System Statistics">
+                <div class="stats-card glass-panel" id="stat-total">
+                    <div class="stats-icon blue">
+                        <i class="fa-solid fa-link"></i>
+                    </div>
+                    <div class="stats-info">
+                        <h3>Total Apps</h3>
+                        <div class="stats-value" id="val-total">0</div>
+                    </div>
+                </div>
+
+                <div class="stats-card glass-panel" id="stat-active">
+                    <div class="stats-icon green">
+                        <i class="fa-solid fa-circle-play"></i>
+                    </div>
+                    <div class="stats-info">
+                        <h3>Active Pings</h3>
+                        <div class="stats-value" id="val-active">0</div>
+                    </div>
+                </div>
+
+                <div class="stats-card glass-panel" id="stat-avg-time">
+                    <div class="stats-icon purple">
+                        <i class="fa-solid fa-gauge-high"></i>
+                    </div>
+                    <div class="stats-info">
+                        <h3>Avg Response</h3>
+                        <div class="stats-value" id="val-avg-time">0 <span class="unit">ms</span></div>
+                    </div>
+                </div>
+
+                <div class="stats-card glass-panel" id="stat-uptime">
+                    <div class="stats-icon orange">
+                        <i class="fa-solid fa-chart-line"></i>
+                    </div>
+                    <div class="stats-info">
+                        <h3>Global Uptime</h3>
+                        <div class="stats-value" id="val-uptime">100<span class="unit">%</span></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Main Body -->
+            <main class="main-content">
+                <div class="section-header">
+                    <div class="section-title-wrap">
+                        <h2>Monitored Applications</h2>
+                        <p class="section-subtitle">Real-time status of your deployed apps</p>
+                    </div>
+                    <div class="filter-actions">
+                        <button class="filter-btn active" id="filter-all" onclick="filterTargets('all')">All</button>
+                        <button class="filter-btn" id="filter-active" onclick="filterTargets('active')">Active</button>
+                        <button class="filter-btn" id="filter-inactive"
+                            onclick="filterTargets('inactive')">Paused</button>
+                        <button class="icon-btn-refresh" id="refresh-dashboard" onclick="loadDashboardData()"
+                            e="Refresh Dashboard">
+                            <i class="fa-solid fa-rotate"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Target Cards Grid -->
+                <div class="cards-grid" id="targets-grid">
+                    <!-- Fallback empty state -->
+                    <div class="empty-state-container glass-panel" id="empty-state">
+                        <div class="empty-icon-wrap">
+                            <i class="fa-solid fa-square-rss empty-signal"></i>
+                        </div>
+                        <h3>No Keep-Alive Links Found</h3>
+                        <p>Add your first web application URL to keep it active and monitor its response metrics.</p>
+                        <button class="btn btn-primary" onclick="openAddModal()">
+                            <i class="fa-solid fa-plus"></i> Register New App
+                        </button>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Footer -->
+            <footer class="app-footer-bar">
+                <p>&copy; 2026 Keep-Alive Manager. Powered by FastAPI & SQLite. Engineered with Premium Glassmorphism.
+                </p>
+            </footer>
+        </div>
+
+        <!-- DB Explorer Tab Content -->
+        <div id="db-tab-content" class="tab-content" style="display: none;">
+            <div id="db-app-content">
+                <!-- 1. Connection Portal Screen -->
+                <div id="connection-screen" class="screen active">
+                    <div class="connection-glow"></div>
+                    <div class="connection-card">
+                        <div class="brand">
+                            <div class="logo">
+                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path
+                                        d="M12 2C8 6.5 6 10.5 6 14C6 17.5 8.5 20.5 12 21C15.5 20.5 18 17.5 18 14C18 10.5 16 6.5 12 2Z"
+                                        fill="url(#mongoGrad)" stroke="#10B981" stroke-width="1.5"
+                                        stroke-linejoin="round" />
+                                    <path d="M12 2V21" stroke="#ffffff" stroke-width="1" stroke-linecap="round" />
+                                    <defs>
+                                        <linearGradient id="mongoGrad" x1="12" y1="2" x2="12" y2="21"
+                                            gradientUnits="userSpaceOnUse">
+                                            <stop stop-color="#10B981" />
+                                            <stop offset="1" stop-color="#059669" />
+                                        </linearGradient>
+                                    </defs>
+                                </svg>
+                            </div>
+                            <h1>MongoDB Portal</h1>
+                            <p>Manage your databases with premium aesthetic control</p>
+                        </div>
+
+                        <form id="connect-form" class="connect-form">
+                            <div class="form-group">
+                                <label for="connection-profile">Connection Profile</label>
+                                <div class="custom-select-wrapper">
+                                    <select id="connection-profile">
+                                        <option value="local" selected>Local MongoDB (Default)</option>
+                                        <option value="predefined">Predefined MongoDB URL</option>
+                                        <option value="custom">Custom Connection URI...</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="connection-uri">MongoDB Connection URI</label>
+                                <div class="input-wrapper">
+                                    <input type="text" id="connection-uri" placeholder="mongodb://localhost:27017"
+                                        value="mongodb://localhost:27017" required>
+                                    <button type="button" id="btn-clear-uri" class="btn-icon-input" title="Clear">
+                                        <i class="fa-solid fa-xmark"></i>
+                                    </button>
+                                </div>
+                                <small class="help-text">Supports local URIs and MongoDB Atlas srv URLs.</small>
+                            </div>
+
+                            <button type="submit" id="btn-connect" class="btn btn-primary btn-block">
+                                <span>Connect to Database</span>
+                                <i class="fa-solid fa-arrow-right-long"></i>
+                            </button>
+                        </form>
+
+                        <div class="connection-footer">
+                            <span>Dynamic Client Engine v1.0.0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Main Dashboard Explorer Screen -->
+                <div id="dashboard-screen" class="screen">
+                    <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+                    <!-- Sidebar -->
+                    <aside class="sidebar">
+                        <!-- Sidebar Header / Brand -->
+                        <div class="sidebar-brand">
+                            <div class="logo-sm">
+                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+                                    style="width:24px; height:24px;">
+                                    <path
+                                        d="M12 2C8 6.5 6 10.5 6 14C6 17.5 8.5 20.5 12 21C15.5 20.5 18 17.5 18 14C18 10.5 16 6.5 12 2Z"
+                                        fill="#10B981" />
+                                </svg>
+                            </div>
+                            <h2>DB Handler</h2>
+                        </div>
+
+                        <!-- Active Connection Status Card -->
+                        <div class="connection-status-card">
+                            <div class="status-indicator">
+                                <span class="pulse-dot"></span>
+                                <span class="status-text">Connected</span>
+                            </div>
+                            <div id="active-host-text" class="active-host-text">mongodb://localhost:27017</div>
+                            <button id="btn-disconnect" class="btn btn-outline btn-sm btn-block">
+                                <i class="fa-solid fa-power-off"></i> Disconnect
+                            </button>
+                        </div>
+
+                        <!-- Database Selector -->
+                        <div class="sidebar-section">
+                            <div class="section-header">
+                                <span>Database</span>
+                            </div>
+                            <div class="custom-select-wrapper">
+                                <select id="db-select" class="db-select">
+                                    <option value="" disabled selected>Select Database...</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Collections Section -->
+                        <div class="sidebar-section fill-remaining">
+                            <div class="section-header">
+                                <span>Collections</span>
+                                <button id="btn-show-create-coll" class="btn-circle" title="Create Collection"
+                                    type="button">
+                                    <i class="fa-solid fa-plus"></i>
+                                </button>
+                            </div>
+                            <div class="search-box">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                                <input type="text" id="collection-search" placeholder="Filter collections...">
+                            </div>
+                            <div id="collections-list" class="collections-list">
+                                <div class="empty-state-text">Select a database to view collections</div>
+                            </div>
+                        </div>
+
+                    </aside>
+
+                    <!-- Main Content Panel -->
+                    <main class="main-content">
+                        <!-- Top Explorer Bar -->
+                        <header class="explorer-header">
+                            <div class="breadcrumb">
+                            <button id="btn-toggle-sidebar" class="btn-icon btn-sidebar-toggle" title="Toggle Sidebar" type="button">
+                                <i class="fa-solid fa-bars"></i>
+                            </button>
+                            <span class="bc-home">Cluster</span>
+                            <span class="bc-sep">/</span>
+                            <span id="bc-db" class="bc-active">-</span>
+                            <span class="bc-sep">/</span>
+                            <span id="bc-coll" class="bc-active">-</span>
+                        </div>
+                            <div class="header-actions">
+                                <button id="btn-add-doc" class="btn btn-success" disabled type="button">
+                                    <i class="fa-solid fa-plus"></i> Add Document
+                                </button>
+                                <button id="btn-drop-coll" class="btn btn-outline-danger" title="Drop Collection"
+                                    disabled type="button">
+                                    <i class="fa-solid fa-trash-can"></i> Drop Collection
+                                </button>
+                            </div>
+                        </header>
+
+                        <!-- Advanced Query Bar Panel -->
+                        <section class="query-section">
+                            <div class="query-panel-card">
+                                <div class="query-card-header">
+                                    <div class="header-title">
+                                        <i class="fa-solid fa-filter"></i>
+                                        <span>Search Query Filter</span>
+                                    </div>
+                                    <button id="btn-toggle-query-help" class="query-help-btn" type="button">
+                                        <span>Query Help</span>
+                                    </button>
+                                </div>
+                                <div class="query-help-content hidden" id="query-help-content">
+                                    <p>Enter a standard MongoDB JSON query. You can filter by fields, use query
+                                        operators, or target ObjectIds. Example syntax:</p>
+                                    <div class="examples-grid">
+                                        <code>{} <span class="comment">// Match all</span></code>
+                                        <code>{"status": "active"} <span class="comment">// Standard match</span></code>
+                                        <code>{"age": {"$gte": 21}} <span class="comment">// Greater/Equal</span></code>
+                                        <code>{"_id": {"$oid": "60c72b..."}} <span class="comment">// Match by ObjectId</span></code>
+                                    </div>
+                                </div>
+                                <div class="query-body">
+                                    <textarea id="query-filter-input" placeholder="{}" spellcheck="false"></textarea>
+                                    <div class="query-actions">
+                                        <div class="sort-inputs">
+                                            <input type="text" id="query-sort-field" placeholder="Sort by field...">
+                                            <div class="custom-select-wrapper">
+                                                <select id="query-sort-order">
+                                                    <option value="1">Ascending (1)</option>
+                                                    <option value="-1">Descending (-1)</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="action-buttons">
+                                            <button id="btn-reset-query" class="btn btn-outline"
+                                                type="button">Reset</button>
+                                            <button id="btn-run-query" class="btn btn-primary" type="button">Find
+                                                Documents</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Document Dashboard Workspace -->
+                        <section class="document-section">
+                            <div class="document-section-header">
+                                <span id="document-count-label" class="count-label">0 Documents found</span>
+                                <div class="view-options">
+                                    <span class="refresh-indicator" id="refresh-indicator"></span>
+                                    <button id="btn-refresh-docs" class="btn-icon" title="Refresh" type="button">
+                                        <i class="fa-solid fa-arrows-rotate"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Document Grid List -->
+                            <div id="documents-grid" class="documents-grid">
+                                <div class="dashboard-empty-state">
+                                    <div class="empty-art">
+                                        <i class="fa-solid fa-folder-open"></i>
+                                    </div>
+                                    <h3>No collection selected</h3>
+                                    <p>Select a database and choose a collection from the sidebar to view documents, or
+                                        filter your active documents.</p>
+                                </div>
+                            </div>
+
+                            <!-- Pagination Controls -->
+                            <div class="pagination-bar hidden" id="pagination-bar">
+                                <div class="page-size-selector">
+                                    <span>Show:</span>
+                                    <div class="custom-select-wrapper">
+                                        <select id="page-size-select">
+                                            <option value="5">5 entries</option>
+                                            <option value="10" selected>10 entries</option>
+                                            <option value="25">25 entries</option>
+                                            <option value="50">50 entries</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="pagination-controls">
+                                    <button id="btn-prev-page" class="btn-circle btn-nav" title="Previous Page"
+                                        type="button">
+                                        <i class="fa-solid fa-angle-left"></i>
+                                    </button>
+                                    <span id="pagination-text" class="pagination-text">Page 1 of 1</span>
+                                    <button id="btn-next-page" class="btn-circle btn-nav" title="Next Page"
+                                        type="button">
+                                        <i class="fa-solid fa-angle-right"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </section>
+                    </main>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Form (Add / Edit Target) -->
+    <div class="modal-overlay" id="target-modal">
+        <div class="modal-content glass-panel popup-anim">
+            <div class="modal-header">
+                <h2 id="modal-title">Register App Link</h2>
+                <button class="close-btn" onclick="closeModal()" aria-label="Close Modal">&times;</button>
+            </div>
+
+            <form id="target-form" onsubmit="handleFormSubmit(event)">
+                <input type="hidden" id="edit-id" name="id">
+
+                <div class="form-group">
+                    <label for="target-name">Application Name</label>
+                    <div class="input-wrapper">
+                        <i class="fa-solid fa-signature input-icon"></i>
+                        <input type="text" id="target-name" name="name" required
+                            placeholder="e.g., Portfolio API, Discord Bot Dashboard">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="target-url">Application URL</label>
+                    <div class="input-wrapper">
+                        <i class="fa-solid fa-globe input-icon"></i>
+                        <input type="url" id="target-url" name="url" required
+                            placeholder="https://my-awesome-app.onrender.com">
+                    </div>
+                    <small class="form-hint">Must begin with https:// or http://</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="target-interval">Keep-Alive Interval (Minutes)</label>
+                    <div class="interval-selector">
+                        <div class="range-wrap">
+                            <input type="range" id="target-interval" name="interval" min="1" max="60" value="10"
+                                oninput="updateIntervalValue(this.value)">
+                            <div class="bubble" id="interval-bubble">10m</div>
+                        </div>
+                        <div class="interval-suggestions">
+                            <span onclick="setPresetInterval(5)">5m</span>
+                            <span onclick="setPresetInterval(10)" class="active-preset">10m</span>
+                            <span onclick="setPresetInterval(15)">15m</span>
+                            <span onclick="setPresetInterval(30)">30m</span>
+                        </div>
+                    </div>
+                    <small class="form-hint">Frequency of ping requests to keep the server awake. Recommended: 5-15
+                        mins.</small>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="submit-btn">Save Configuration</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- DB Explorer Modals Container -->
+    <div id="db-modals-container">
+        <!-- A. Create Collection Modal -->
+        <div id="create-coll-modal" class="modal-overlay">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <h3>Create New Collection</h3>
+                    <button type="button" class="btn-close modal-close-trigger">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <form id="create-coll-form">
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="new-coll-name">Collection Name</label>
+                            <input type="text" id="new-coll-name" placeholder="e.g. users, products_v2" required
+                                pattern="^[a-zA-Z0-9_\-\.]+$"
+                                title="Only letters, numbers, underscores, hyphens, and dots allowed.">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline modal-close-trigger">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Create Collection</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- B. Add / Edit Document Modal -->
+        <div id="document-modal" class="modal-overlay">
+            <div class="modal-card modal-lg">
+                <div class="modal-header">
+                    <h3 id="doc-modal-title">Edit Document</h3>
+                    <button type="button" class="btn-close modal-close-trigger">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <form id="document-form">
+                    <div class="modal-body editor-body">
+                        <div class="editor-header">
+                            <span>JSON Editor</span>
+                            <span class="editor-syntax-status valid" id="editor-syntax-status">
+                                <span class="status-dot"></span>
+                                <span class="status-label">Valid JSON</span>
+                            </span>
+                        </div>
+                        <div class="editor-wrapper">
+                            <textarea id="document-editor" class="document-editor" spellcheck="false"
+                                required></textarea>
+                        </div>
+                        <div id="editor-error-msg" class="editor-error-msg hidden"></div>
+                        <div class="editor-helper-bar">
+                            <span>Tip: Special types format: <code>{"$oid": "24-hex-chars"}</code> or
+                                <code>{"$date": "ISO-date-string"}</code></span>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline modal-close-trigger">Cancel</button>
+                        <button type="submit" id="btn-save-document" class="btn btn-primary">Save Document</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- C. Confirm Danger Actions Modal -->
+        <div id="confirm-danger-modal" class="modal-overlay">
+            <div class="modal-card danger-card">
+                <div class="modal-header">
+                    <h3 id="danger-modal-title">Confirm Destructive Action</h3>
+                    <button type="button" class="btn-close modal-close-trigger">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="danger-icon-container">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                    <p id="danger-modal-message">Are you absolutely sure you want to proceed? This action is
+                        irreversible.</p>
+                    <div id="danger-confirm-type-wrapper" class="form-group hidden">
+                        <label for="danger-confirm-input" id="danger-confirm-label">Type collection name <b
+                                id="danger-confirm-keyword"></b> to confirm:</label>
+                        <input type="text" id="danger-confirm-input" autocomplete="off" placeholder="Confirm name...">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline modal-close-trigger">Cancel</button>
+                    <button type="button" id="btn-confirm-danger" class="btn btn-danger">Confirm & Execute</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Floating Toast Notifications System -->
+        <div id="db-toast-container" class="toast-container"></div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="/static/js/app.js" defer></script>
+</body>
+
+</html>
