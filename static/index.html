@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en" class="theme-system">
+
+<head>
+    <script>
+        (function() {
+            const theme = localStorage.getItem("mustdo_theme") || "system";
+            const html = document.documentElement;
+            html.className = "theme-" + theme;
+            if (theme === "system") {
+                if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+                    html.classList.add("theme-light");
+                } else {
+                    html.classList.add("theme-dark");
+                }
+            } else if (theme === "white") {
+                html.classList.add("theme-light");
+            } else if (theme === "black") {
+                html.classList.add("theme-dark");
+            }
+        })();
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="MustDO – A premium deadline-driven task manager with automatic Telegram notification alerts. Never miss a deadline again.">
+    <title>MustDO - Premium Deadline-driven Tasks & Telegram Alerts</title>
+    <!-- Inline SVG Favicon -->
+    <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238b5cf6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='m9 12 2 2 4-4'/%3E%3C/svg%3E">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css?v=2.0.0">
+</head>
+
+<body>
+    <!-- App Container -->
+    <div id="app">
+        <!-- Floating Toast Notification -->
+        <div id="toast" class="toast-hidden"></div>
+
+        <!-- AUTHENTICATION SCREEN -->
+        <div id="auth-screen" class="view-container auth-container hidden">
+            <div class="auth-card glass-panel">
+                <div class="auth-header">
+                    <div class="app-logo">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
+                            <path d="m9 12 2 2 4-4" />
+                        </svg>
+                    </div>
+                    <h1>MustDO</h1>
+                    <p>Track deadlines. Complete tasks. Mute alerts.</p>
+                </div>
+
+                <!-- Login Form -->
+                <form id="login-form" class="auth-form">
+                    <h2 class="form-title">Welcome Back</h2>
+                    <div class="input-group">
+                        <label for="login-username">Username</label>
+                        <input type="text" id="login-username" required placeholder="Enter username">
+                    </div>
+                    <div class="input-group">
+                        <label for="login-password">Password</label>
+                        <input type="password" id="login-password" required placeholder="Enter password">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full pulse-glow">Log In</button>
+                    <p class="auth-switch">Don't have an account? <span id="to-register">Register here</span></p>
+                </form>
+
+                <!-- Register Form -->
+                <form id="register-form" class="auth-form hidden">
+                    <h2 class="form-title">Create Account</h2>
+                    <div class="input-group">
+                        <label for="register-username">Username</label>
+                        <input type="text" id="register-username" required placeholder="At least 3 characters">
+                    </div>
+                    <div class="input-group">
+                        <label for="register-password">Password</label>
+                        <input type="password" id="register-password" required placeholder="At least 6 characters">
+                    </div>
+                    <button type="submit" class="btn btn-accent btn-full pulse-glow">Create Account</button>
+                    <p class="auth-switch">Already registered? <span id="to-login">Log in here</span></p>
+                </form>
+            </div>
+        </div>
+
+        <!-- MAIN DASHBOARD SCREEN -->
+        <div id="dashboard-screen" class="view-container dashboard-container hidden">
+            <!-- Navigation Header -->
+            <header class="glass-header">
+                <div class="header-left">
+                    <div class="app-logo-small">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
+                            <path d="m9 12 2 2 4-4" />
+                        </svg>
+                    </div>
+                    <span class="logo-text">MustDO</span>
+                    <span class="user-badge" id="username-badge">User</span>
+                </div>
+
+                <div class="header-right">
+                    <!-- Theme Selector Toggle Group -->
+                    <div class="theme-selector-group glass-panel-compact">
+                        <button class="theme-btn active" id="theme-system-btn" title="System default theme">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect width="20" height="14" x="2" y="3" rx="2" />
+                                <line x1="8" x2="16" y1="21" y2="21" />
+                                <line x1="12" x2="12" y1="17" y2="21" />
+                            </svg>
+                        </button>
+                        <button class="theme-btn" id="theme-white-btn" title="Light theme">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="4" />
+                                <path d="M12 2v2" />
+                                <path d="M12 20v2" />
+                                <path d="m4.93 4.93 1.41 1.41" />
+                                <path d="m17.66 17.66 1.41 1.41" />
+                                <path d="M2 12h2" />
+                                <path d="M20 12h2" />
+                                <path d="m6.34 17.66-1.41 1.41" />
+                                <path d="m19.07 4.93-1.41 1.41" />
+                            </svg>
+                        </button>
+                        <button class="theme-btn" id="theme-black-btn" title="Dark theme">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Admin Access Button -->
+                    <button class="btn btn-secondary hidden" id="admin-panel-btn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path
+                                d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                            <circle cx="12" cy="12" r="3" />
+                        </svg>
+                        <span class="btn-text">Admin Panel</span>
+                    </button>
+
+                    <!-- Profile Settings Button -->
+                    <button class="btn btn-secondary" id="profile-settings-btn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                            <circle cx="12" cy="7" r="4" />
+                        </svg>
+                        <span class="btn-text">Telegram Set</span>
+                    </button>
+
+                    <input type="file" id="import-tasks-file" accept=".json" style="display: none;">
+
+                    <!-- Log Out -->
+                    <button class="btn btn-danger-link" id="logout-btn">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                            <polyline points="16 17 21 12 16 7" />
+                            <line x1="21" x2="9" y1="12" y2="12" />
+                        </svg>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Analytics Overview row -->
+            <div class="stats-row">
+                <div class="stat-card glass-panel flex-stat">
+                    <div class="stat-icon icon-total">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 20h9" />
+                            <path d="M3 20v-8a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v8" />
+                            <path d="M3 12V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v6" />
+                            <path d="M13 20v-4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4" />
+                            <path d="M13 14V9a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v5" />
+                        </svg>
+                    </div>
+                    <div>
+                        <span class="stat-label">Total Todos</span>
+                        <h3 class="stat-value" id="stat-total">0</h3>
+                    </div>
+                </div>
+                <div class="stat-card glass-panel flex-stat">
+                    <div class="stat-icon icon-pending">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="12 6 12 12 16 14" />
+                        </svg>
+                    </div>
+                    <div>
+                        <span class="stat-label">Pending</span>
+                        <h3 class="stat-value" id="stat-pending">0</h3>
+                    </div>
+                </div>
+                <div class="stat-card glass-panel flex-stat">
+                    <div class="stat-icon icon-completed">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                            <polyline points="22 4 12 14.01 9 11.01" />
+                        </svg>
+                    </div>
+                    <div>
+                        <span class="stat-label">Completed</span>
+                        <h3 class="stat-value text-accent" id="stat-completed">0</h3>
+                    </div>
+                </div>
+                <div class="stat-card glass-panel flex-stat border-overdue">
+                    <div class="stat-icon icon-overdue alert-bell">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                            <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+                        </svg>
+                    </div>
+                    <div>
+                        <span class="stat-label">Overdue</span>
+                        <h3 class="stat-value text-danger" id="stat-overdue">0</h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Workspace Layout -->
+            <div class="workspace-grid">
+                <!-- Task List Panel -->
+                <div class="workspace-right">
+                    <div class="list-controls glass-panel-compact">
+                        <div class="filter-tabs">
+                            <button class="filter-tab active" data-filter="all">All</button>
+                            <button class="filter-tab" data-filter="active">Active</button>
+                            <button class="filter-tab" data-filter="completed">Completed</button>
+                            <button class="filter-tab text-danger" data-filter="overdue">Overdue</button>
+                        </div>
+                        <div class="list-search">
+                            <input type="text" id="search-input" placeholder="Search tasks...">
+                        </div>
+                    </div>
+
+                    <!-- Options Row -->
+                    <div class="list-options-row">
+                        <label class="toggle-container">
+                            <input type="checkbox" id="show-next-notification-toggle">
+                            <span class="toggle-switch"></span>
+                            <span class="toggle-label">Show next notification time</span>
+                        </label>
+                    </div>
+
+                    <!-- Tasks List DOM Target -->
+                    <div id="todos-list" class="todos-list-container">
+                        <!-- Tasks dynamically injected here -->
+                        <div class="empty-state glass-panel">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
+                                <path d="m9 12 2 2 4-4" />
+                            </svg>
+                            <p>No tasks found. Click the '+' button at the bottom right to get started!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CREATE TASK MODAL OVERLAY -->
+        <div id="create-task-modal" class="modal-overlay hidden">
+            <div class="modal-card glass-panel animate-slide-up">
+                <div class="modal-header">
+                    <h2>Create New Task</h2>
+                    <button class="close-modal-btn" id="close-create-task-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="create-task-form">
+                        <div class="input-group">
+                            <label for="task-title">Task Title</label>
+                            <input type="text" id="task-title" required placeholder="What needs to be done?">
+                        </div>
+                        <div class="input-group">
+                            <label for="task-desc">Description</label>
+                            <textarea id="task-desc" placeholder="Details about the task (optional)..."
+                                rows="3"></textarea>
+                        </div>
+
+                        <div class="input-row-2">
+                            <div class="input-group">
+                                <label for="task-deadline">Deadline</label>
+                                <input type="datetime-local" id="task-deadline" required>
+                            </div>
+                            <div class="input-group">
+                                <label for="task-priority">Priority</label>
+                                <select id="task-priority">
+                                    <option value="low">🟢 Low</option>
+                                    <option value="medium" selected>🟡 Medium</option>
+                                    <option value="high">🔴 High</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="input-group">
+                            <label for="task-interval">Telegram Alert Interval</label>
+                            <select id="task-interval">
+                                <option value="1">⚡ Continuous (Every 1 minute - Dev/Test)</option>
+                                <option value="5">⏱️ Urgent (Every 5 minutes)</option>
+                                <option value="30">⏱️ Normal (Every 30 minutes)</option>
+                                <option value="60" selected>⏱️ Hourly (Every 1 hour)</option>
+                                <option value="240">⏱️ Multi-Hour (Every 4 hours)</option>
+                                <option value="1440">⏱️ Daily (Every 24 hours)</option>
+                            </select>
+                            <small class="input-help">How often we will spam you on Telegram until complete!</small>
+                        </div>
+
+                        <div class="modal-actions">
+                            <button type="button" class="btn btn-secondary" id="cancel-create-task-btn">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Add Todo & Arm Alerts</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- TELEGRAM PROFILE MODAL OVERLAY -->
+        <div id="profile-modal" class="modal-overlay hidden">
+            <div class="modal-card glass-panel animate-slide-up">
+                <div class="modal-header">
+                    <h2>Setup Telegram Notifications</h2>
+                    <button class="close-modal-btn" id="close-profile-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert-info glass-panel-compact">
+                        <h4>How to receive Telegram notifications?</h4>
+                        <ol>
+                            <li>Create a Telegram bot using <a href="https://t.me/BotFather" target="_blank"
+                                    style="color: var(--primary);">@BotFather</a> to get a Bot Token.</li>
+                            <li>Search for your bot on Telegram and start it (send <code>/start</code>).</li>
+                            <li>Retrieve your Telegram Chat ID (e.g. via <a href="https://t.me/userinfobot"
+                                    target="_blank" style="color: var(--primary);">@userinfobot</a>).</li>
+                            <li>Enter your Bot Token and Chat ID below to link and enable alerts.</li>
+                        </ol>
+                    </div>
+
+                    <form id="profile-update-form">
+                        <div class="input-group">
+                            <label for="profile-bot-token">Custom Telegram Bot Token</label>
+                            <input type="password" id="profile-bot-token"
+                                placeholder="Leave empty to use system default bot">
+                        </div>
+
+                        <div class="input-group">
+                            <label for="profile-chat-id">Your Telegram Chat ID</label>
+                            <input type="text" id="profile-chat-id" placeholder="e.g. 123456789" required>
+                        </div>
+
+                        <div class="input-group">
+                            <label for="profile-password">Change Password (optional)</label>
+                            <input type="password" id="profile-password"
+                                placeholder="Leave empty to keep current password">
+                        </div>
+
+                        <div class="modal-actions">
+                            <button type="button" class="btn btn-secondary" id="cancel-profile-btn">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save Settings</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- ADMIN PANEL MODAL OVERLAY -->
+        <div id="admin-modal" class="modal-overlay hidden">
+            <div class="modal-card modal-card-large glass-panel animate-slide-up">
+                <div class="modal-header">
+                    <h2>System Administrator Control Panel</h2>
+                    <button class="close-modal-btn" id="close-admin-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <!-- Global Telegram Setup -->
+                    <div class="admin-section glass-panel-compact">
+                        <h3>Global Telegram Bot Settings</h3>
+                        <form id="admin-settings-form" class="flex-form-row">
+                            <div class="input-group flex-input-grow">
+                                <label for="admin-bot-token">Telegram Bot Token (from @BotFather)</label>
+                                <input type="password" id="admin-bot-token" placeholder="Enter Bot API Token" required>
+                            </div>
+                            <button type="submit" class="btn btn-accent btn-inline">Save Token</button>
+                        </form>
+                    </div>
+
+                    <!-- User Directory -->
+                    <div class="admin-section">
+                        <h3>Registered Users Directory</h3>
+                        <div class="table-scroll-container">
+                            <table class="admin-users-table">
+                                <thead>
+                                    <tr>
+                                        <th>Username</th>
+                                        <th>Role</th>
+                                        <th>Telegram Chat ID</th>
+                                        <th>Total Tasks</th>
+                                        <th>Completed</th>
+                                        <th>Completion Rate</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-users-table-body">
+                                    <!-- Dynamic rows loaded here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TASK EDIT MODAL OVERLAY -->
+        <div id="edit-task-modal" class="modal-overlay hidden">
+            <div class="modal-card glass-panel animate-slide-up">
+                <div class="modal-header">
+                    <h2>Edit Todo Task</h2>
+                    <button class="close-modal-btn" id="close-edit-task-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="edit-task-form">
+                        <input type="hidden" id="edit-task-id">
+
+                        <div class="input-group">
+                            <label for="edit-task-title">Task Title</label>
+                            <input type="text" id="edit-task-title" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="edit-task-desc">Description</label>
+                            <textarea id="edit-task-desc" rows="3"></textarea>
+                        </div>
+
+                        <div class="input-row-2">
+                            <div class="input-group">
+                                <label for="edit-task-deadline">Deadline</label>
+                                <input type="datetime-local" id="edit-task-deadline" required>
+                            </div>
+                            <div class="input-group">
+                                <label for="edit-task-priority">Priority</label>
+                                <select id="edit-task-priority">
+                                    <option value="low">Low</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="high">High</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="input-group">
+                            <label for="edit-task-interval">Telegram Alert Interval</label>
+                            <select id="edit-task-interval">
+                                <option value="1">Continuous (Every 1 minute)</option>
+                                <option value="5">Urgent (Every 5 minutes)</option>
+                                <option value="30">Normal (Every 30 minutes)</option>
+                                <option value="60">Hourly (Every 1 hour)</option>
+                                <option value="240">Multi-Hour (Every 4 hours)</option>
+                                <option value="1440">Daily (Every 24 hours)</option>
+                            </select>
+                        </div>
+
+                        <div class="modal-actions">
+                            <button type="button" class="btn btn-secondary" id="cancel-edit-task-btn">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Update Task</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- TASK EXPORT MODAL OVERLAY -->
+        <div id="export-task-modal" class="modal-overlay hidden">
+            <div class="modal-card glass-panel animate-slide-up" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h2>Export Tasks</h2>
+                    <button class="close-modal-btn" id="close-export-task-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p class="modal-subtitle" style="margin: 0; color: var(--text-secondary); font-size: 14px;">
+                        Select the tasks you want to export to a JSON file.
+                    </p>
+                    <div style="display: flex; align-items: center; gap: 8px; user-select: none;">
+                        <input type="checkbox" id="export-select-all" style="width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer;">
+                        <label for="export-select-all" style="font-weight: 600; font-size: 14px; cursor: pointer; color: var(--text-primary);">Select All</label>
+                    </div>
+                    <div id="export-tasks-list" class="export-tasks-list">
+                        <!-- Dynamically populated tasks -->
+                    </div>
+                    <div class="modal-actions" style="margin-top: 4px;">
+                        <button type="button" class="btn btn-secondary" id="cancel-export-task-btn">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="submit-export-task-btn">Download JSON</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Floating Action Menu Container -->
+        <div class="floating-action-group hidden">
+            <!-- Import Button -->
+            <button id="import-tasks-btn" class="fab-sub-btn" title="Import Tasks from JSON">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" x2="12" y1="3" y2="15" />
+                </svg>
+            </button>
+
+            <!-- Export Button -->
+            <button id="export-tasks-btn" class="fab-sub-btn" title="Export Tasks to JSON">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" x2="12" y1="15" y2="3" />
+                </svg>
+            </button>
+
+            <!-- Main Add Button -->
+            <button id="floating-add-btn" class="floating-add-btn" title="Create New Task">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" x2="12" y1="5" y2="19" />
+                    <line x1="5" x2="19" y1="12" y2="12" />
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+        Built with ❤️ by <span>MustDO</span> &mdash; Track deadlines. Complete tasks. Mute alerts.
+    </footer>
+
+    <!-- JavaScript Bundle -->
+    <script src="/static/js/app.js?v=2.0.0"></script>
+</body>
+
+</html>
