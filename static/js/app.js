@@ -8,7 +8,7 @@ let state = {
     token: localStorage.getItem("mustdo_token") || null,
     user: null,
     todos: [],
-    filter: "all",
+    filter: "active",
     searchQuery: "",
     theme: localStorage.getItem("mustdo_theme") || "system",
     selectedTodoIds: [],
