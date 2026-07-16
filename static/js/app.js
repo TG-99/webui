@@ -75,6 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
   DOM.targetUrl = document.getElementById('target-url');
   DOM.targetInterval = document.getElementById('target-interval');
   DOM.intervalBubble = document.getElementById('interval-bubble');
+  DOM.targetOrder = document.getElementById('target-order');
 
   // Initialize theme system
   initGlobalTheme();
@@ -238,7 +239,7 @@ function renderTargetsGrid() {
   const fragment = document.createDocumentFragment();
   const sparklineIds = [];
   filtered.forEach(target => {
-    fragment.appendChild(createTargetCardElement(target));
+    fragment.appendChild(createTargetCardElement(target, filtered));
     sparklineIds.push(target.id);
   });
   grid.appendChild(fragment);
@@ -248,9 +249,14 @@ function renderTargetsGrid() {
 }
 
 // Construct target card element DOM
-function createTargetCardElement(target) {
+function createTargetCardElement(target, filtered) {
   const card = document.createElement('div');
   card.id = `target-${target.id}`;
+
+  const filteredIndex = filtered.findIndex(t => t.id === target.id);
+  const isFirst = filteredIndex === 0;
+  const isLast = filteredIndex === filtered.length - 1;
+  const targetIndex = appTargets.findIndex(t => t.id === target.id) + 1;
 
   // Set theme CSS custom properties based on status
   let themeColor = 'var(--primary)';
@@ -289,7 +295,9 @@ function createTargetCardElement(target) {
   card.innerHTML = `
         <div class="card-header">
             <div class="target-title-wrap">
-                <h3 title="${target.name}">${target.name}</h3>
+                <h3 title="${target.name}">
+                    <span class="card-order-badge">#${targetIndex}</span>${target.name}
+                </h3>
                 <a href="${target.url}" target="_blank" rel="noopener noreferrer" class="target-url-link" title="Open App in New Tab">
                     ${cleanURLDisplay(target.url)} <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 0.65rem;"></i>
                 </a>
@@ -335,6 +343,12 @@ function createTargetCardElement(target) {
             </label>
             
             <div class="card-control-btns">
+                <button class="action-icon-btn reorder-btn" onclick="moveTarget('${target.id}', 'up')" title="Move Up" ${isFirst ? 'disabled' : ''}>
+                    <i class="fa-solid fa-chevron-up"></i>
+                </button>
+                <button class="action-icon-btn reorder-btn" onclick="moveTarget('${target.id}', 'down')" title="Move Down" ${isLast ? 'disabled' : ''}>
+                    <i class="fa-solid fa-chevron-down"></i>
+                </button>
                 <button class="action-icon-btn ping-btn" onclick="triggerManualPing('${target.id}', this)" title="Trigger Instant Ping Check" ${target.active === 0 ? 'disabled' : ''}>
                     <i class="fa-solid fa-bolt"></i>
                 </button>
@@ -615,12 +629,64 @@ window.filterTargets = function (filter) {
   renderTargetsGrid();
 }
 
+// Reorder targets manually using Move Up / Move Down controls
+async function moveTarget(id, direction) {
+  const filtered = appTargets.filter(target => {
+    if (currentFilter === 'active') return target.active === 1;
+    if (currentFilter === 'inactive') return target.active === 0;
+    return true;
+  });
+
+  const index = filtered.findIndex(t => t.id === id);
+  if (index === -1) return;
+
+  const newIndex = direction === 'up' ? index - 1 : index + 1;
+  if (newIndex < 0 || newIndex >= filtered.length) return;
+
+  const itemA = filtered[index];
+  const itemB = filtered[newIndex];
+
+  const globalIndexA = appTargets.findIndex(t => t.id === itemA.id);
+  const globalIndexB = appTargets.findIndex(t => t.id === itemB.id);
+
+  if (globalIndexA === -1 || globalIndexB === -1) return;
+
+  // Swap in local memory array
+  const temp = appTargets[globalIndexA];
+  appTargets[globalIndexA] = appTargets[globalIndexB];
+  appTargets[globalIndexB] = temp;
+
+  // Instantly update the DOM grid for real-time smoothness
+  renderTargetsGrid();
+
+  try {
+    const orderedIds = appTargets.map(t => t.id);
+    const response = await fetch('/api/targets/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ordered_ids: orderedIds })
+    });
+    if (!response.ok) throw new Error('Network response not ok');
+    const data = await response.json();
+    showToast('Application order updated successfully.', 'success');
+  } catch (err) {
+    console.error('Reorder error:', err);
+    showToast('Failed to sync new order with server.', 'error');
+    loadDashboardData();
+  }
+}
+window.moveTarget = moveTarget;
+
 // Modal handling
 window.openAddModal = function () {
   editMode = false;
   DOM.modalTitle.textContent = 'Register App Link';
   DOM.targetForm.reset();
   DOM.editId.value = '';
+  
+  if (DOM.targetOrder) {
+    DOM.targetOrder.value = appTargets.length + 1;
+  }
 
   // Set preset bubble
   updateIntervalValue(10);
@@ -638,6 +704,10 @@ window.openEditModal = function (id) {
   DOM.editId.value = target.id;
   DOM.targetName.value = target.name;
   DOM.targetUrl.value = target.url;
+  
+  if (DOM.targetOrder) {
+    DOM.targetOrder.value = target.order || (appTargets.findIndex(t => t.id === id) + 1);
+  }
 
   const interval = target.interval || 10;
   updateIntervalValue(interval);
@@ -680,8 +750,9 @@ async function handleFormSubmit(event) {
   const name = DOM.targetName.value;
   const url = DOM.targetUrl.value;
   const interval = parseInt(DOM.targetInterval.value);
+  const order = DOM.targetOrder ? parseInt(DOM.targetOrder.value) : undefined;
 
-  const payload = { name, url, interval };
+  const payload = { name, url, interval, order };
 
   let apiUrl = '/api/targets';
   let method = 'POST';

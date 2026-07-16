@@ -102,15 +102,33 @@ def init_db():
         db.ping_logs.create_index("target_id")
         db.ping_logs.create_index("timestamp")
         db.targets.create_index("active")
+        db.targets.create_index("order")
+        
+        # Check if any target is missing 'order' field
+        if db.targets.count_documents({"order": {"$exists": False}}) > 0:
+            logger.info("Some targets are missing 'order' field. Re-indexing all targets...")
+            all_targets = list(db.targets.find().sort("created_at", DESCENDING))
+            for index, target in enumerate(all_targets):
+                db.targets.update_one(
+                    {"_id": target["_id"]},
+                    {"$set": {"order": index + 1}}
+                )
+            logger.info("Re-indexing completed successfully.")
         
         logger.info("MongoDB collections and indexes initialized successfully.")
     except Exception as e:
         logger.error(f"Error initializing MongoDB database: {e}")
 
-def add_target(name: str, url: str, interval: int = 10) -> str:
+def add_target(name: str, url: str, interval: int = 10, order: Optional[int] = None) -> str:
     """Adds a new Keep-Alive target to targets collection."""
     dhaka_tz = datetime.timezone(datetime.timedelta(hours=6))
     created_at = datetime.datetime.now(dhaka_tz).isoformat()
+    if order is None:
+        try:
+            highest = db.targets.find_one(sort=[("order", DESCENDING)])
+            order = (highest["order"] + 1) if (highest and "order" in highest) else 1
+        except Exception:
+            order = 1
     new_target = {
         "name": name.strip(),
         "url": url.strip(),
@@ -120,14 +138,15 @@ def add_target(name: str, url: str, interval: int = 10) -> str:
         "last_pinged_at": None,
         "status": "PENDING",
         "last_response_time": None,
-        "last_status_code": None
+        "last_status_code": None,
+        "order": order
     }
     result = db.targets.insert_one(new_target)
     return str(result.inserted_id)
 
 def get_all_targets():
-    """Retrieves all Keep-Alive targets."""
-    targets = db.targets.find().sort("created_at", DESCENDING)
+    """Retrieves all Keep-Alive targets sorted by order."""
+    targets = db.targets.find().sort([("order", 1), ("created_at", DESCENDING)])
     return [serialize_doc(t) for t in targets]
 
 def get_target_by_id(target_id: str):
@@ -148,16 +167,19 @@ def toggle_target_active(target_id: str, active: int):
     except Exception as e:
         logger.error(f"Error toggling active status: {e}")
 
-def update_target_details(target_id: str, name: str, url: str, interval: int):
-    """Updates target name, url, and check interval."""
+def update_target_details(target_id: str, name: str, url: str, interval: int, order: Optional[int] = None):
+    """Updates target name, url, check interval, and order."""
     try:
+        update_fields = {
+            "name": name.strip(),
+            "url": url.strip(),
+            "interval": interval
+        }
+        if order is not None:
+            update_fields["order"] = order
         db.targets.update_one(
             {"_id": ObjectId(target_id)},
-            {"$set": {
-                "name": name.strip(),
-                "url": url.strip(),
-                "interval": interval
-            }}
+            {"$set": update_fields}
         )
     except Exception as e:
         logger.error(f"Error updating target details: {e}")
@@ -174,8 +196,8 @@ def delete_target(target_id: str):
         logger.error(f"Error deleting target: {e}")
 
 def get_active_targets():
-    """Retrieves active Keep-Alive targets."""
-    targets = db.targets.find({"active": 1})
+    """Retrieves active Keep-Alive targets sorted by order."""
+    targets = db.targets.find({"active": 1}).sort([("order", 1), ("created_at", DESCENDING)])
     return [serialize_doc(t) for t in targets]
 
 def update_target_ping_status(target_id: str, status: str, response_time: int, status_code: int):
@@ -494,11 +516,13 @@ class TargetCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     url: str = Field(..., min_length=5, max_length=500)
     interval: int = Field(10, ge=1, le=1440) # Interval between 1 minute and 24 hours
+    order: Optional[int] = Field(None, ge=1)
 
 class TargetUpdate(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     url: str = Field(..., min_length=5, max_length=500)
     interval: int = Field(10, ge=1, le=1440)
+    order: Optional[int] = Field(None, ge=1)
 
 class TargetToggle(BaseModel):
     active: bool
@@ -517,7 +541,7 @@ def api_get_targets():
 def api_create_target(target: TargetCreate):
     """Add a new keep-alive app target."""
     try:
-        target_id = add_target(name=target.name, url=target.url, interval=target.interval)
+        target_id = add_target(name=target.name, url=target.url, interval=target.interval, order=target.order)
         return {"success": True, "id": target_id, "message": "Target added successfully."}
     except Exception as e:
         logger.error(f"Error creating target: {e}")
@@ -527,12 +551,12 @@ def api_create_target(target: TargetCreate):
 
 @app.put("/api/targets/{target_id}")
 def api_update_target(target_id: str, target: TargetUpdate):
-    """Update name, URL, and interval details of a target."""
+    """Update name, URL, interval details, and order of a target."""
     existing = get_target_by_id(target_id)
     if not existing:
         raise HTTPException(status_code=404, detail="Target not found")
     try:
-        update_target_details(target_id, name=target.name, url=target.url, interval=target.interval)
+        update_target_details(target_id, name=target.name, url=target.url, interval=target.interval, order=target.order)
         return {"success": True, "message": "Target details updated."}
     except Exception as e:
         logger.error(f"Error updating target: {e}")
@@ -566,6 +590,23 @@ def api_delete_target(target_id: str):
     except Exception as e:
         logger.error(f"Error deleting target: {e}")
         raise HTTPException(status_code=500, detail="Internal server error deleting target")
+
+class ReorderPayload(BaseModel):
+    ordered_ids: List[str]
+
+@app.post("/api/targets/reorder")
+def api_reorder_targets(payload: ReorderPayload):
+    """Update target order sequence."""
+    try:
+        for index, target_id in enumerate(payload.ordered_ids):
+            db.targets.update_one(
+                {"_id": ObjectId(target_id)},
+                {"$set": {"order": index + 1}}
+            )
+        return {"success": True, "message": "Targets reordered successfully."}
+    except Exception as e:
+        logger.error(f"Error reordering targets: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error reordering targets")
 
 @app.get("/api/targets/{target_id}/logs")
 def api_get_target_logs(target_id: str, limit: int = 20):

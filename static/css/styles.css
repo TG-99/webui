@@ -792,8 +792,8 @@ input:checked+.slider:before {
 
 .modal-content {
   width: 100%;
-  max-width: 520px;
-  padding: 2rem;
+  max-width: 460px;
+  padding: 1.25rem 1.5rem;
   position: relative;
   border-color: rgba(255, 255, 255, 0.1);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
@@ -803,8 +803,8 @@ input:checked+.slider:before {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.75rem;
-  padding-bottom: 0.75rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
@@ -831,7 +831,7 @@ input:checked+.slider:before {
 
 /* Form Styling */
 .form-group {
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.9rem;
 }
 
 .form-group label {
@@ -839,7 +839,7 @@ input:checked+.slider:before {
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--text-main);
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.35rem;
 }
 
 .input-wrapper {
@@ -860,10 +860,10 @@ input:checked+.slider:before {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
-  padding: 0.75rem 1rem 0.75rem 2.5rem;
+  padding: 0.55rem 1rem 0.55rem 2.5rem;
   color: #fff;
   font-family: var(--font-body);
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   transition: all var(--transition-normal);
 }
 
@@ -886,7 +886,7 @@ input:checked+.slider:before {
   background: rgba(0, 0, 0, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.04);
   border-radius: 10px;
-  padding: 1rem;
+  padding: 0.65rem 0.85rem;
 }
 
 .range-wrap {
@@ -894,7 +894,7 @@ input:checked+.slider:before {
   display: flex;
   align-items: center;
   gap: 1rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.65rem;
 }
 
 .range-wrap input[type=range] {
@@ -965,9 +965,9 @@ input:checked+.slider:before {
   display: flex;
   justify-content: flex-end;
   gap: 1rem;
-  margin-top: 2rem;
+  margin-top: 1rem;
   border-top: 1px solid rgba(255, 255, 255, 0.05);
-  padding-top: 1.25rem;
+  padding-top: 0.85rem;
 }
 
 /* Animations */
@@ -3326,4 +3326,103 @@ html.light-theme ::-webkit-scrollbar-thumb:hover {
     }
   }
 
+}
+
+/* ==========================================================================
+   TARGET CARD ORDERING STYLING
+   ========================================================================== */
+.card-order-badge {
+  background: var(--card-theme-glow);
+  color: var(--card-theme-color);
+  font-size: 0.8rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  margin-right: 0.5rem;
+  font-weight: 700;
+  display: inline-block;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  vertical-align: middle;
+}
+
+html.light-theme .card-order-badge {
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+.action-icon-btn.reorder-btn:hover {
+  color: var(--primary);
+  background: rgba(0, 122, 255, 0.1);
+  border-color: rgba(0, 122, 255, 0.2);
+}
+
+.action-icon-btn.reorder-btn:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Custom Number Input Spinner Redesign */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+.number-input-wrapper {
+  position: relative;
+}
+
+.number-input-wrapper input {
+  padding-right: 3rem !important; /* Make room for custom spinner buttons */
+}
+
+.number-spinner-btns {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 5;
+}
+
+.spinner-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  width: 22px;
+  height: 13px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.5rem;
+  transition: all var(--transition-fast);
+  padding: 0;
+}
+
+.spinner-btn:hover {
+  background: rgba(0, 122, 255, 0.15);
+  color: var(--primary);
+  border-color: rgba(0, 122, 255, 0.3);
+}
+
+.spinner-btn:active {
+  transform: scale(0.92);
+}
+
+html.light-theme .spinner-btn {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+html.light-theme .spinner-btn:hover {
+  background: rgba(79, 70, 229, 0.08);
+  color: var(--primary);
+  border-color: rgba(79, 70, 229, 0.2);
 }

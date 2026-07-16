@@ -439,6 +439,24 @@
                 </div>
 
                 <div class="form-group">
+                    <label for="target-order">Position Index</label>
+                    <div class="input-wrapper number-input-wrapper">
+                        <i class="fa-solid fa-list-ol input-icon"></i>
+                        <input type="number" id="target-order" name="order" min="1" required
+                            placeholder="e.g., 1, 2, 3">
+                        <div class="number-spinner-btns">
+                            <button type="button" class="spinner-btn spinner-up" onclick="document.getElementById('target-order').stepUp();" title="Increase Index">
+                                <i class="fa-solid fa-chevron-up"></i>
+                            </button>
+                            <button type="button" class="spinner-btn spinner-down" onclick="document.getElementById('target-order').stepDown();" title="Decrease Index">
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <small class="form-hint">Display priority order (1st, 2nd, 3rd, etc.)</small>
+                </div>
+
+                <div class="form-group">
                     <label for="target-interval">Keep-Alive Interval (Minutes)</label>
                     <div class="interval-selector">
                         <div class="range-wrap">
