@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MOHAMMAD CONSTRUCTION & ENGINEERING - Worker Attendance System</title>
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+  <!-- Login Screen Overlay -->
+  <div id="loginOverlay" class="login-wrapper">
+    <div class="login-card animate-fade-in">
+      <div class="login-brand">
+        <div class="login-brand-icon">
+          <i class="fa-solid fa-helmet-safety"></i>
+        </div>
+        <h1>Mohammad Construction</h1>
+        <p>& Engineering Sdn.Bhd.</p>
+      </div>
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label class="form-label" for="loginUsername">Username</label>
+          <input type="text" id="loginUsername" class="form-control" placeholder="e.g. admin or sitemanager" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" class="form-control" placeholder="••••••••" required>
+        </div>
+        <div id="loginError" class="alert alert-danger"
+          style="display:none; color: var(--danger); font-size:0.85rem; margin-bottom:1rem;"></div>
+        <button type="submit" class="btn btn-accent" style="width: 100%; padding: 0.75rem;">
+          <i class="fa-solid fa-right-to-bracket"></i> Sign In to Portal
+        </button>
+      </form>
+      <div style="margin-top: 1.5rem; text-align: center; font-size: 0.75rem; color: var(--text-muted);">
+        <p>Default Admin Login: <strong>admin</strong> / <strong>admin123</strong></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- App Main Layout -->
+  <div id="app" style="display:none;">
+
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="brand-icon">
+          <i class="fa-solid fa-helmet-safety"></i>
+        </div>
+        <div class="brand-text">
+          <h2>Mohammad</h2>
+          <span>CONSTRUCTION & ENG.</span>
+        </div>
+        <button class="mobile-sidebar-close-btn" onclick="toggleSidebar()" aria-label="Close sidebar">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section-title">Core Management</div>
+        <a class="nav-item active" onclick="switchSection('dashboard', this)">
+          <i class="fa-solid fa-chart-pie"></i>
+          <span>Dashboard</span>
+        </a>
+        <a class="nav-item" onclick="switchSection('attendance', this)">
+          <i class="fa-solid fa-calendar-check"></i>
+          <span>Daily Attendance</span>
+        </a>
+        <a class="nav-item" onclick="switchSection('workers', this)">
+          <i class="fa-solid fa-users-gear"></i>
+          <span>Workers List</span>
+        </a>
+
+        <div class="nav-section-title">Site Operations</div>
+        <a class="nav-item" onclick="switchSection('projects', this)">
+          <i class="fa-solid fa-city"></i>
+          <span>Projects Sites</span>
+        </a>
+        <a class="nav-item" onclick="switchSection('groups', this)">
+          <i class="fa-solid fa-layer-group"></i>
+          <span>Worker Groups</span>
+        </a>
+
+        <div class="nav-section-title admin-only">System Admin</div>
+        <a class="nav-item admin-only" onclick="switchSection('users', this)">
+          <i class="fa-solid fa-user-shield"></i>
+          <span>Site Managers</span>
+        </a>
+        <a class="nav-item" onclick="switchSection('reports', this)">
+          <i class="fa-solid fa-file-invoice-dollar"></i>
+          <span>Payroll Reports</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-badge">
+          <div class="user-avatar" id="sidebarAvatar">A</div>
+          <div class="user-info">
+            <div class="user-name" id="sidebarUserName">Admin User</div>
+            <div class="user-role" id="sidebarUserRole">Admin</div>
+          </div>
+          <button class="btn-logout" title="Sign Out" onclick="handleLogout()">
+            <i class="fa-solid fa-power-off"></i>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Sidebar Mobile Backdrop Overlay -->
+    <div id="sidebarOverlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+    <!-- Main Wrapper -->
+    <div class="main-wrapper">
+
+      <!-- Top Header Bar -->
+      <header class="top-header">
+        <div class="header-left">
+          <button class="toggle-sidebar-btn" id="sidebarToggleBtn" onclick="toggleSidebar()" aria-label="Toggle Navigation Menu">
+            <div class="hamburger-icon">
+              <span class="bar bar-top"></span>
+              <span class="bar bar-middle"></span>
+              <span class="bar bar-bottom"></span>
+            </div>
+          </button>
+          <h1 class="page-title" id="pageTitle">Attendance Dashboard</h1>
+        </div>
+        <div class="header-right">
+          <div class="date-display">
+            <i class="fa-regular fa-calendar"></i>
+            <span id="headerDateStr">Today</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Content Body -->
+      <main class="content-body">
+
+        <!-- SECTION 1: DASHBOARD -->
+        <section id="section-dashboard" class="app-section animate-fade-in">
+          <!-- Stats Row -->
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-icon total">
+                <i class="fa-solid fa-users"></i>
+              </div>
+              <div class="stat-info">
+                <h3>Total Active Workers</h3>
+                <div class="stat-value" id="statTotalWorkers">0</div>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon present">
+                <i class="fa-solid fa-user-check"></i>
+              </div>
+              <div class="stat-info">
+                <h3>Present Today</h3>
+                <div class="stat-value" id="statPresent">0</div>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon late">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+              </div>
+              <div class="stat-info">
+                <h3>Late Check-ins</h3>
+                <div class="stat-value" id="statLate">0</div>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon absent">
+                <i class="fa-solid fa-user-xmark"></i>
+              </div>
+              <div class="stat-info">
+                <h3>Absent Workers</h3>
+                <div class="stat-value" id="statAbsent">0</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Worker Work Details Lookup -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <i class="fa-solid fa-magnifying-glass-chart"></i> Worker Attendance History
+              </div>
+            </div>
+            <div class="worker-lookup-controls">
+              <!-- Custom Worker Picker -->
+              <div class="filter-item" style="flex: 2.5; min-width: 260px; position: relative;">
+                <label class="form-label"><i class="fa-solid fa-hard-hat"></i> Select Worker</label>
+                <div class="worker-picker" id="workerPicker">
+                  <!-- Trigger button -->
+                  <button type="button" class="worker-picker-trigger" id="workerPickerTrigger"
+                    onclick="toggleWorkerPicker(event)" aria-haspopup="listbox" aria-expanded="false">
+                    <div class="wp-trigger-inner" id="wpTriggerInner">
+                      <div class="wp-placeholder">
+                        <span class="wp-placeholder-icon"><i class="fa-solid fa-hard-hat"></i></span>
+                        <span class="wp-placeholder-text">— Choose a Worker —</span>
+                      </div>
+                    </div>
+                    <i class="fa-solid fa-chevron-down wp-chevron" id="wpChevron"></i>
+                  </button>
+                  <!-- Dropdown panel -->
+                  <div class="worker-picker-panel" id="workerPickerPanel" role="listbox">
+                    <div class="wp-search-wrap">
+                      <i class="fa-solid fa-magnifying-glass wp-search-icon"></i>
+                      <input type="text" id="wpSearchInput" class="wp-search-input"
+                        placeholder="Search by name or passport…"
+                        oninput="filterWorkerPicker(this.value)"
+                        onclick="event.stopPropagation()">
+                    </div>
+                    <div class="wp-list" id="wpList"></div>
+                    <div class="wp-empty" id="wpEmpty" style="display:none;">
+                      <i class="fa-solid fa-face-frown-open"></i> No workers found
+                    </div>
+                  </div>
+                </div>
+                <!-- Hidden value holder -->
+                <input type="hidden" id="lookupWorkerSelect" value="">
+              </div>
+
+              <div class="filter-item" style="flex: 1; min-width: 155px;">
+                <label class="form-label"><i class="fa-regular fa-calendar"></i> From Date</label>
+                <input type="date" id="lookupStartDate" class="form-control" onchange="lookupWorkerDetails()">
+              </div>
+              <div class="filter-item" style="flex: 1; min-width: 155px;">
+                <label class="form-label"><i class="fa-regular fa-calendar-check"></i> To Date</label>
+                <input type="date" id="lookupEndDate" class="form-control" onchange="lookupWorkerDetails()">
+              </div>
+              <div style="display:flex; align-items:flex-end;">
+                <button class="btn btn-accent" onclick="lookupWorkerDetails()">
+                  <i class="fa-solid fa-search"></i> Search
+                </button>
+              </div>
+            </div>
+
+            <!-- Results area -->
+            <div id="workerLookupResult" style="display:none;">
+              <!-- Worker info bar -->
+              <div id="lookupWorkerInfoBar" class="lookup-info-bar"></div>
+              <!-- Summary chips -->
+              <div id="lookupSummaryBar" class="lookup-summary-bar"></div>
+              <!-- Table -->
+              <div class="table-responsive">
+                <table class="table lookup-history-table" id="lookupHistoryTable">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Date</th>
+                      <th>Day</th>
+                      <th>Status</th>
+                      <th>Check-In</th>
+                      <th>Check-Out</th>
+                      <th>Hours Worked</th>
+                      <th>Work Volume</th>
+                      <th>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody id="lookupHistoryBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div id="workerLookupEmpty" class="worker-lookup-empty" style="display:none;">
+              <i class="fa-solid fa-calendar-xmark"></i>
+              <p>No attendance records found for this worker in the selected period.</p>
+            </div>
+            <div id="workerLookupPlaceholder" class="worker-lookup-placeholder">
+              <i class="fa-solid fa-table-list"></i>
+              <p>Select a worker above to view their full attendance history.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- SECTION 2: DAILY ATTENDANCE -->
+        <section id="section-attendance" class="app-section animate-fade-in" style="display: none;">
+          <!-- Compact Sleek Date Banner -->
+          <div id="attendanceDateBanner" class="attendance-date-banner banner-today">
+            <div class="date-banner-left">
+              <div class="date-banner-icon" id="dateBannerIcon">
+                <i class="fa-regular fa-calendar-check"></i>
+              </div>
+              <div class="date-banner-content">
+                <div class="date-banner-tag" id="dateBannerTag">
+                  <i class="fa-solid fa-circle"></i> TODAY'S ATTENDANCE SHEET
+                </div>
+                <div class="date-banner-title" id="dateBannerTitle">
+                  Loading Date...
+                </div>
+              </div>
+            </div>
+            <div class="date-nav-quick">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="stepAttendanceDate(-1)"
+                title="Previous Day">
+                <i class="fa-solid fa-chevron-left"></i> Prev Day
+              </button>
+              <button type="button" class="btn btn-primary btn-sm" onclick="stepAttendanceDate(0)"
+                title="Jump to Today">
+                <i class="fa-solid fa-calendar-day"></i> Today
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="stepAttendanceDate(1)" title="Next Day">
+                Next Day <i class="fa-solid fa-chevron-right"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="filter-bar">
+            <div class="filter-item" style="flex: 1.3; min-width: 240px;">
+              <label class="form-label"><i class="fa-regular fa-calendar"></i> Select Date</label>
+              <div class="date-input-group">
+                <button type="button" class="btn btn-secondary btn-sm date-step-btn" onclick="stepAttendanceDate(-1)"
+                  title="Previous Day">
+                  <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                <input type="date" id="attendanceDate" class="form-control" onchange="loadAttendanceSheet()">
+                <button type="button" class="btn btn-secondary btn-sm date-step-btn" onclick="stepAttendanceDate(1)"
+                  title="Next Day">
+                  <i class="fa-solid fa-chevron-right"></i>
+                </button>
+              </div>
+            </div>
+            <div class="filter-item">
+              <label class="form-label"><i class="fa-solid fa-city"></i> Project Site</label>
+              <select id="attendanceProjectFilter" class="form-select" onchange="loadAttendanceSheet()">
+                <option value="">All Active Projects</option>
+              </select>
+            </div>
+            <div class="filter-item">
+              <label class="form-label"><i class="fa-solid fa-layer-group"></i> Worker Group</label>
+              <select id="attendanceGroupFilter" class="form-select" onchange="loadAttendanceSheet()">
+                <option value="">All Worker Groups</option>
+              </select>
+            </div>
+            <div class="filter-actions">
+              <button class="btn btn-success filter-btn-full" onclick="triggerBatchCheckIn()">
+                <i class="fa-solid fa-check-double"></i> Batch Check-In (08:00 AM)
+              </button>
+              <button class="btn btn-warning filter-btn-full" onclick="triggerBatchCheckOut()">
+                <i class="fa-solid fa-right-from-bracket"></i> Batch Check-Out (06:00 PM)
+              </button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <i class="fa-solid fa-clipboard-user"></i> Daily Worker Details Table
+              </div>
+              <button type="button" class="btn btn-secondary btn-sm mobile-only-inline" id="btnToggleExpandAll"
+                onclick="toggleAllWorkerCards()">
+                <i class="fa-solid fa-arrows-up-down"></i> <span id="lblToggleExpandAll">Expand All</span>
+              </button>
+            </div>
+            <div class="table-responsive">
+              <table class="table" id="attendanceTable">
+                <thead>
+                  <tr>
+                    <th>Worker Details</th>
+                    <th>Group / Project</th>
+                    <th style="min-width: 175px;">Check-In Time</th>
+                    <th style="min-width: 175px;">Check-Out Time</th>
+                    <th>Total Hours</th>
+                    <th style="min-width: 170px;">Daily Work Volume</th>
+                    <th>Confirm</th>
+                  </tr>
+                </thead>
+                <tbody id="attendanceTableBody">
+                  <!-- Dynamic attendance rows -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- SECTION 3: Workers List -->
+        <section id="section-workers" class="app-section animate-fade-in" style="display: none;">
+          <div class="filter-bar">
+            <div class="filter-item" style="flex: 2;">
+              <label class="form-label"><i class="fa-solid fa-magnifying-glass"></i> Search Worker</label>
+              <input type="text" id="workerSearchQuery" class="form-control"
+                placeholder="Search by name or passport number..." onkeyup="loadWorkers()">
+            </div>
+            <div class="filter-item">
+              <label class="form-label">Project</label>
+              <select id="workerProjectFilter" class="form-select" onchange="loadWorkers()">
+                <option value="">All Projects</option>
+              </select>
+            </div>
+            <div class="filter-item">
+              <label class="form-label">Group</label>
+              <select id="workerGroupFilter" class="form-select" onchange="loadWorkers()">
+                <option value="">All Groups</option>
+              </select>
+            </div>
+            <div class="filter-item">
+              <label class="form-label">Status</label>
+              <select id="workerStatusFilter" class="form-select" onchange="loadWorkers()">
+                <option value="">All Statuses</option>
+                <option value="Active">Active</option>
+                <option value="On Leave">On Leave</option>
+                <option value="Resigned">Resigned</option>
+                <option value="Terminated">Terminated</option>
+              </select>
+            </div>
+            <div style="display:flex; align-items:flex-end;">
+              <button class="btn btn-accent" onclick="openWorkerModal()">
+                <i class="fa-solid fa-user-plus"></i> Add Worker
+              </button>
+            </div>
+          </div>
+
+          <div class="grid-cards" id="workersGrid">
+            <!-- Dynamic Worker Cards -->
+          </div>
+        </section>
+
+        <!-- SECTION 4: PROJECTS SITES -->
+        <section id="section-projects" class="app-section animate-fade-in" style="display: none;">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <i class="fa-solid fa-city"></i> Construction Project Sites
+              </div>
+              <button class="btn btn-accent btn-sm" onclick="openProjectModal()">
+                <i class="fa-solid fa-plus"></i> Add Project
+              </button>
+            </div>
+            <div class="table-responsive">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Project Name</th>
+                    <th>Location</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="projectsTableBody">
+                  <!-- Dynamic Projects -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- SECTION 5: WORKER GROUPS -->
+        <section id="section-groups" class="app-section animate-fade-in" style="display: none;">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <i class="fa-solid fa-layer-group"></i> Worker Groups
+              </div>
+              <button class="btn btn-accent btn-sm" onclick="openGroupModal()">
+                <i class="fa-solid fa-plus"></i> Add Worker Group
+              </button>
+            </div>
+            <div class="table-responsive">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Group Name</th>
+                    <th>Description</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="groupsTableBody">
+                  <!-- Dynamic Groups -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- SECTION 6: SITE MANAGERS (ADMIN ONLY) -->
+        <section id="section-users" class="app-section animate-fade-in" style="display: none;">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <i class="fa-solid fa-user-shield"></i> Site Manager & User Accounts
+              </div>
+              <button class="btn btn-accent btn-sm" onclick="openUserModal()">
+                <i class="fa-solid fa-user-plus"></i> Add Site Manager
+              </button>
+            </div>
+            <div class="table-responsive">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Username</th>
+                    <th>Full Name</th>
+                    <th>Role</th>
+                    <th>Assigned Site / Project</th>
+                    <th>Phone Number</th>
+                    <th>Allowed Tabs</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="usersTableBody">
+                  <!-- Dynamic Users -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- SECTION 7: PAYROLL REPORTS -->
+        <section id="section-reports" class="app-section animate-fade-in" style="display: none;">
+          <div class="filter-bar" style="margin-bottom: 1.5rem;">
+            <div class="filter-item">
+              <label class="form-label"><i class="fa-regular fa-calendar"></i> Start Date</label>
+              <input type="date" id="reportStartDate" class="form-control" onchange="loadReportTable()">
+            </div>
+            <div class="filter-item">
+              <label class="form-label"><i class="fa-regular fa-calendar-check"></i> End Date</label>
+              <input type="date" id="reportEndDate" class="form-control" onchange="loadReportTable()">
+            </div>
+            <div class="filter-item">
+              <label class="form-label"><i class="fa-solid fa-city"></i> Project Site</label>
+              <select id="reportProjectFilter" class="form-select" onchange="loadReportTable()">
+                <option value="">All Active Projects</option>
+              </select>
+            </div>
+            <div class="filter-item">
+              <label class="form-label"><i class="fa-solid fa-layer-group"></i> Worker Group</label>
+              <select id="reportGroupFilter" class="form-select" onchange="loadReportTable()">
+                <option value="">All Worker Groups</option>
+              </select>
+            </div>
+            <div style="display:flex; align-items:flex-end; gap:0.5rem;">
+              <button class="btn btn-primary" onclick="loadReportTable()">
+                <i class="fa-solid fa-filter"></i> Apply Filter
+              </button>
+              <button class="btn btn-success" onclick="exportAttendanceCSV()">
+                <i class="fa-solid fa-download"></i> Export CSV
+              </button>
+            </div>
+          </div>
+
+          <!-- Summary cards for Payroll report -->
+          <div
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+            <div class="stat-card" style="padding: 1rem 1.25rem;">
+              <div class="stat-icon total" style="width: 40px; height: 40px; font-size: 1.1rem;">
+                <i class="fa-solid fa-users"></i>
+              </div>
+              <div class="stat-info">
+                <h3 style="font-size: 0.8rem;">Total Workers</h3>
+                <div class="stat-value" id="reportTotalWorkers" style="font-size: 1.4rem;">0</div>
+              </div>
+            </div>
+            <div class="stat-card" style="padding: 1rem 1.25rem;">
+              <div class="stat-icon late" style="width: 40px; height: 40px; font-size: 1.1rem;">
+                <i class="fa-solid fa-calendar-check"></i>
+              </div>
+              <div class="stat-info">
+                <h3 style="font-size: 0.8rem;">Total Days Worked</h3>
+                <div class="stat-value" id="reportTotalDays" style="font-size: 1.4rem;">0 days</div>
+              </div>
+            </div>
+            <div class="stat-card" style="padding: 1rem 1.25rem;">
+              <div class="stat-icon present" style="width: 40px; height: 40px; font-size: 1.1rem;">
+                <i class="fa-solid fa-clock"></i>
+              </div>
+              <div class="stat-info">
+                <h3 style="font-size: 0.8rem;">Total Hours Worked</h3>
+                <div class="stat-value" id="reportTotalHours" style="font-size: 1.4rem;">0 hrs</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <i class="fa-solid fa-file-csv"></i> Payroll & Attendance Export Summary
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="exportAttendanceCSV()">
+                <i class="fa-solid fa-download"></i> Download Export (CSV)
+              </button>
+            </div>
+            <div class="table-responsive">
+              <table class="table" id="reportTable">
+                <thead>
+                  <tr>
+                    <th>Name & Passport</th>
+                    <th>Project / Group</th>
+                    <th>Days Worked</th>
+                    <th>Total Hours Worked</th>
+                    <th>Total Work Volume</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="reportTableBody">
+                  <!-- Dynamic report rows -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- MODALS -->
+
+  <!-- Admin 24-Hour Edit Confirmation Modal -->
+  <div class="modal-backdrop" id="adminConfirmModal">
+    <div class="modal-box" style="max-width: 460px;">
+      <div class="modal-header"
+        style="background: linear-gradient(135deg, #FEF3C7, #FDE68A); border-bottom: 1px solid #F59E0B;">
+        <h3 class="modal-title" style="color: #78350F; display:flex; align-items:center; gap:0.5rem;">
+          <i class="fa-solid fa-triangle-exclamation" style="color: #D97706;"></i> Admin Edit Confirmation (>24h)
+        </h3>
+        <button class="modal-close" onclick="closeModal('adminConfirmModal')">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 1.25rem;">
+        <div style="text-align: center; margin-bottom: 1rem;">
+          <div
+            style="width: 56px; height: 56px; border-radius: 50%; background: #FEF3C7; color: #D97706; display: flex; align-items: center; justify-content: center; font-size: 1.75rem; margin: 0 auto 0.75rem;">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+          </div>
+          <h4 id="adminConfirmWorkerName" style="font-size: 1.1rem; color: var(--primary); font-weight: 700;">Worker
+            Name</h4>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;" id="adminConfirmRecordDate">
+            Recorded: Date / Time</p>
+        </div>
+        <div class="alert alert-warning"
+          style="background: #FFFBEB; border: 1px solid #FCD34D; color: #92400E; padding: 0.85rem; border-radius: var(--radius-md); font-size: 0.85rem; line-height: 1.4;">
+          <i class="fa-solid fa-shield-halved" style="color: #D97706; margin-right: 0.35rem;"></i>
+          <strong>Notice:</strong> This worker work detail was recorded <strong>more than 24 hours ago</strong>. Site
+          managers are locked from editing this record. As an Admin, do you want to proceed with updating these work
+          details?
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('adminConfirmModal')">Cancel</button>
+        <button type="button" class="btn btn-accent" id="adminConfirmSubmitBtn">
+          <i class="fa-solid fa-check"></i> Yes, Confirm & Save
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add/Edit Worker Modal -->
+  <div class="modal-backdrop" id="workerModal">
+    <div class="modal-box" style="max-width: 580px;">
+      <div class="modal-header" style="padding: 0.85rem 1.25rem;">
+        <h3 class="modal-title" id="workerModalTitle"><i class="fa-solid fa-user-gear"
+            style="color:var(--accent-amber); margin-right:0.4rem;"></i> Add Construction Worker</h3>
+        <button class="modal-close" onclick="closeModal('workerModal')">&times;</button>
+      </div>
+      <form id="workerForm" onsubmit="saveWorker(event)">
+        <input type="hidden" id="workerId">
+        <div class="modal-body" style="padding: 1rem 1.25rem;">
+          <div style="display: grid; grid-template-columns: 1.4fr 1fr; gap: 0.75rem; margin-bottom: 0.65rem;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" style="margin-bottom:0.25rem; font-size:0.8rem;">Worker Full Name *</label>
+              <input type="text" id="workerName" class="form-control" placeholder="e.g. Mohammad Al-Amin" required
+                style="padding:0.45rem 0.75rem;">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" style="margin-bottom:0.25rem; font-size:0.8rem;">Passport No. (Optional)</label>
+              <input type="text" id="workerPassport" class="form-control" placeholder="e.g. A98765432"
+                style="padding:0.45rem 0.75rem;">
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.65rem;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" style="margin-bottom:0.25rem; font-size:0.8rem;">Phone Contact</label>
+              <input type="text" id="workerPhone" class="form-control" placeholder="+60 12-345 6789"
+                style="padding:0.45rem 0.75rem;">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" style="margin-bottom:0.25rem; font-size:0.8rem;">Worker Status *</label>
+              <select id="workerStatus" class="form-select" style="padding:0.45rem 0.75rem; font-weight:600;">
+                <option value="Active">Active</option>
+                <option value="On Leave">On Leave</option>
+                <option value="Resigned">Resigned</option>
+                <option value="Terminated">Terminated</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.65rem;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" style="margin-bottom:0.25rem; font-size:0.8rem;">Assigned Project Site</label>
+              <select id="workerProject" class="form-select" style="padding:0.45rem 0.75rem;">
+                <option value="">Select Project Site</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" style="margin-bottom:0.25rem; font-size:0.8rem;">Worker Trade / Group</label>
+              <select id="workerGroup" class="form-select" style="padding:0.45rem 0.75rem;">
+                <option value="">Select Group</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom:0.25rem;">
+            <label class="form-label" style="margin-bottom:0.25rem; font-size:0.8rem;">Worker Picture URL / Image
+              Link</label>
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+              <img id="workerPhotoPreview"
+                src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMjQgMjQgZmlsbD0iIzk0QTNCOCI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bTAgNGMxLjkzIDAgMy41IDEuNTcgMy41IDMuNVMxMy45MyAxMyAxMiAxM3MtMy41LTEuNTctMy41LTMuNVMxMC4wNyA2IDEyIDZ6bTAgMThjLTIuMDMgMC0zLjgtLjg1LTUuMDUtMi4yLjAzLTEuNjggMy4zNy0yLjYgNS4wNS0yLjZzNS4wMi45MiA1LjA1IDIuNkMxNS44IDE5LjE1IDE0LjAzIDIwIDEyIDIweiIvPjwvc3ZnPg=="
+                onerror="handleImgError(this)"
+                style="width:44px; height:44px; border-radius:50%; object-fit:cover; border:2px solid var(--accent-amber); flex-shrink:0;">
+              <input type="text" id="workerPhotoUrl" class="form-control"
+                placeholder="https://example.com/photo.jpg or paste image link" oninput="previewWorkerPhoto()"
+                style="padding:0.45rem 0.75rem;">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer" style="padding: 0.75rem 1.25rem; background-color:#F8FAFC;">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('workerModal')">Cancel</button>
+          <button type="submit" class="btn btn-accent btn-sm"><i class="fa-solid fa-floppy-disk"></i> Save
+            Worker</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add/Edit Project Modal -->
+  <div class="modal-backdrop" id="projectModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 class="modal-title" id="projectModalTitle">Add Construction Project Site</h3>
+        <button class="modal-close" onclick="closeModal('projectModal')">&times;</button>
+      </div>
+      <form id="projectForm" onsubmit="saveProject(event)">
+        <input type="hidden" id="projectId">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Project Name *</label>
+            <input type="text" id="projectName" class="form-control" placeholder="e.g. TRX Commercial Tower - Phase 2"
+              required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Location / City</label>
+            <input type="text" id="projectLocation" class="form-control" placeholder="e.g. Kuala Lumpur">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Status</label>
+            <select id="projectStatus" class="form-select">
+              <option value="Active">Active</option>
+              <option value="On Hold">On Hold</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Assigned Site Manager</label>
+            <select id="projectAssignedManager" class="form-select">
+              <option value="">Select Site Manager</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('projectModal')">Cancel</button>
+          <button type="submit" class="btn btn-accent">Save Project</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add/Edit Worker Group Modal -->
+  <div class="modal-backdrop" id="groupModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 class="modal-title" id="groupModalTitle">Add Worker Group</h3>
+        <button class="modal-close" onclick="closeModal('groupModal')">&times;</button>
+      </div>
+      <form id="groupForm" onsubmit="saveGroup(event)">
+        <input type="hidden" id="groupId">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Group Name *</label>
+            <input type="text" id="groupName" class="form-control" placeholder="e.g. Steelwork & Scaffolding" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Description</label>
+            <textarea id="groupDescription" class="form-control" rows="3"
+              placeholder="Description of trades and scope..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('groupModal')">Cancel</button>
+          <button type="submit" class="btn btn-accent">Save Group</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add/Edit User Account Modal (Admin) -->
+  <div class="modal-backdrop" id="userModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 class="modal-title" id="userModalTitle">Create Site Manager Account</h3>
+        <button class="modal-close" onclick="closeModal('userModal')">&times;</button>
+      </div>
+      <form id="userForm" onsubmit="saveUser(event)">
+        <input type="hidden" id="editUsername">
+        <div class="modal-body">
+          <div class="form-grid-row"
+            style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; align-items: end;">
+            <div class="form-group" style="margin-bottom: 0.6rem;">
+              <label class="form-label"
+                style="margin-bottom: 0.35rem; min-height: 20px; display: flex; align-items: center;">Username *</label>
+              <input type="text" id="newUsername" class="form-control" placeholder="e.g. sitemanager2" required>
+            </div>
+            <div class="form-group" style="margin-bottom: 0.6rem;">
+              <label class="form-label" id="userPasswordLabel"
+                style="margin-bottom: 0.35rem; min-height: 20px; display: flex; align-items: center;">Password *</label>
+              <input type="password" id="newPassword" class="form-control" placeholder="••••••••" required>
+            </div>
+          </div>
+
+          <div class="form-grid-row"
+            style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; align-items: end;">
+            <div class="form-group" style="margin-bottom: 0.6rem;">
+              <label class="form-label"
+                style="margin-bottom: 0.35rem; min-height: 20px; display: flex; align-items: center;">Full Name
+                *</label>
+              <input type="text" id="newFullName" class="form-control" placeholder="e.g. Farhan Zulkifli" required>
+            </div>
+            <div class="form-group" style="margin-bottom: 0.6rem;">
+              <label class="form-label"
+                style="margin-bottom: 0.35rem; min-height: 20px; display: flex; align-items: center;">Phone
+                Number</label>
+              <input type="text" id="newPhone" class="form-control" placeholder="e.g. +60 12-345 6789">
+            </div>
+          </div>
+
+          <div class="form-grid-row"
+            style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; align-items: end;">
+            <div class="form-group" style="margin-bottom: 0.6rem;">
+              <label class="form-label"
+                style="margin-bottom: 0.35rem; min-height: 20px; display: flex; align-items: center;">Role</label>
+              <select id="newRole" class="form-select">
+                <option value="site_manager">Site Manager</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 0.6rem;">
+              <label class="form-label"
+                style="margin-bottom: 0.35rem; min-height: 20px; display: flex; align-items: center;">Assigned Project /
+                Site</label>
+              <select id="newAssignedProject" class="form-select">
+                <option value="">All / Unassigned</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group" id="allowedTabsGroup" style="margin-top: 0.4rem; margin-bottom: 0;">
+            <label class="form-label"
+              style="display:flex; align-items:center; gap:0.4rem; color:var(--primary); margin-bottom: 0.2rem;">
+              <i class="fa-solid fa-shield-halved"></i> Manager Tab Access Permissions
+            </label>
+            <small style="display:block; color:var(--text-muted); margin-bottom: 0.4rem;">Select navigation tabs this
+              site manager is permitted to view:</small>
+            <div
+              style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem 0.75rem; background: var(--bg-app); padding: 0.65rem 0.85rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); align-items: center;">
+              <label
+                style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; cursor: pointer; color: var(--text-main); font-weight: 600; min-height: 26px;">
+                <input type="checkbox" class="tab-perm-checkbox" value="dashboard" checked> <i
+                  class="fa-solid fa-chart-pie" style="color:#0284C7;"></i> Dashboard
+              </label>
+              <label
+                style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; cursor: pointer; color: var(--text-main); font-weight: 600; min-height: 26px;">
+                <input type="checkbox" class="tab-perm-checkbox" value="attendance" checked> <i
+                  class="fa-solid fa-calendar-check" style="color:#059669;"></i> Attendance
+              </label>
+              <label
+                style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; cursor: pointer; color: var(--text-main); font-weight: 600; min-height: 26px;">
+                <input type="checkbox" class="tab-perm-checkbox" value="workers" checked> <i
+                  class="fa-solid fa-users-gear" style="color:var(--primary);"></i> Workers
+              </label>
+              <label
+                style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; cursor: pointer; color: var(--text-main); font-weight: 600; min-height: 26px;">
+                <input type="checkbox" class="tab-perm-checkbox" value="projects" checked> <i class="fa-solid fa-city"
+                  style="color:var(--accent-gold);"></i> Projects
+              </label>
+              <label
+                style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; cursor: pointer; color: var(--text-main); font-weight: 600; min-height: 26px;">
+                <input type="checkbox" class="tab-perm-checkbox" value="groups" checked> <i
+                  class="fa-solid fa-layer-group" style="color:#8B5CF6;"></i> Groups
+              </label>
+              <label
+                style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; cursor: pointer; color: var(--text-main); font-weight: 600; min-height: 26px;">
+                <input type="checkbox" class="tab-perm-checkbox" value="reports" checked> <i
+                  class="fa-solid fa-file-invoice-dollar" style="color:#EC4899;"></i> Reports
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('userModal')">Cancel</button>
+          <button type="submit" class="btn btn-accent" id="userSubmitBtn">Create Account</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Datalist for Construction Work Volume Unit Suggestions -->
+  <datalist id="commonWorkUnits">
+    <option value="30 m">
+    <option value="50 m²">
+    <option value="15 m³">
+    <option value="500 pcs">
+    <option value="5 tons">
+  </datalist>
+
+  <!-- Custom JS Application -->
+  <script src="js/app.js"></script>
+</body>
+
+</html>
