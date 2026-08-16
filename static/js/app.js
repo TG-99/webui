@@ -51,16 +51,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // Set default report & lookup date range: 16th-to-15th monthly cycle start up to today
   const cycleStartStr = get16thCycleStartDate(now);
 
-  const reportStartInput = document.getElementById('reportStartDate');
-  const reportEndInput = document.getElementById('reportEndDate');
-  if (reportStartInput) {
-    reportStartInput.max = todayStr;
-    if (!reportStartInput.value || reportStartInput.value > todayStr) reportStartInput.value = (cycleStartStr > todayStr) ? todayStr : cycleStartStr;
-  }
-  if (reportEndInput) {
-    reportEndInput.max = todayStr;
-    if (!reportEndInput.value || reportEndInput.value > todayStr) reportEndInput.value = todayStr;
-  }
 
   // Set default lookup date range for Worker Attendance History (16th to 15th cycle)
   const lookupStartInput = document.getElementById('lookupStartDate');
@@ -209,7 +199,7 @@ function setupUserSession() {
 function applyRoleBasedAccess() {
   if (!currentUser) return;
   const isSiteManager = (currentUser.role === 'site_manager');
-  let allowedTabs = currentUser.allowed_tabs || ['dashboard', 'face-scanner', 'attendance', 'workers', 'projects', 'groups', 'reports'];
+  let allowedTabs = currentUser.allowed_tabs || ['dashboard', 'face-scanner', 'attendance', 'workers', 'projects', 'groups'];
   
   // Ensure 'face-scanner' is available to site managers by default
   if (!allowedTabs.includes('face-scanner')) {
@@ -263,7 +253,7 @@ function switchSection(sectionId, element) {
       if (sectionId === 'users') {
         sectionId = 'dashboard';
       }
-      const allowedTabs = currentUser.allowed_tabs || ['dashboard', 'attendance', 'workers', 'projects', 'groups', 'reports'];
+      const allowedTabs = currentUser.allowed_tabs || ['dashboard', 'attendance', 'workers', 'projects', 'groups'];
       if (!allowedTabs.includes(sectionId)) {
         sectionId = allowedTabs[0] || 'attendance';
       }
@@ -301,9 +291,9 @@ function switchSection(sectionId, element) {
     'workers': 'Construction Workers List',
     'projects': 'Construction Project Sites',
     'groups': 'Worker Groups',
-    'users': 'Site Managers & Admin Accounts',
-    'reports': 'Payroll & Attendance Export'
+    'users': 'Site Managers & Admin Accounts'
   };
+
   document.getElementById('pageTitle').innerText = titleMap[sectionId] || 'Attendance System';
 
   // Stop scanner camera if leaving face-scanner tab
@@ -330,7 +320,7 @@ function switchSection(sectionId, element) {
   if (sectionId === 'projects') loadProjectsTable();
   if (sectionId === 'groups') loadGroupsTable();
   if (sectionId === 'users') loadUsersTable();
-  if (sectionId === 'reports') loadReportTable();
+
 
   // Close mobile sidebar if open
   const sidebar = document.getElementById('sidebar');
@@ -683,79 +673,6 @@ async function lookupWorkerDetails() {
   }
 }
 
-// Export Worker Attendance History to CSV
-function exportWorkerAttendanceCSV() {
-  if (!_lastWorkerLookupData || !_lastWorkerLookupData.records) {
-    alert("Please search for a worker first before exporting.");
-    return;
-  }
-
-  const data = _lastWorkerLookupData;
-  const w = data.worker || {};
-  let records = [...(data.records || [])];
-  if (_lookupDateSortDir === 'asc') {
-    records.sort((a, b) => a.date.localeCompare(b.date));
-  } else {
-    records.sort((a, b) => b.date.localeCompare(a.date));
-  }
-
-  const startDate = document.getElementById('lookupStartDate')?.value || '';
-  const endDate = document.getElementById('lookupEndDate')?.value || '';
-
-  const clean = (val) => `"${String(val || '').replace(/"/g, '""')}"`;
-
-  let csv = [];
-  csv.push(['MOHAMMAD CONSTRUCTION & ENGINEERING SDN.BHD.']);
-  csv.push(['WORKER ATTENDANCE HISTORY REPORT']);
-  csv.push([]);
-  csv.push(['Worker Name:', w.name || 'N/A']);
-  csv.push(['Passport / ID:', w.passport_number || 'N/A']);
-  csv.push(['Project Site:', w.project_name || 'Unassigned']);
-  csv.push(['Group:', w.group_name || 'General']);
-  csv.push(['Period:', `${startDate || 'Start'} to ${endDate || 'Today'}`]);
-  csv.push(['Total Days Worked:', data.days_worked || 0]);
-  csv.push(['Total Hours:', `${data.total_hours || 0} hrs`]);
-  csv.push([]);
-
-  // Table Headers
-  csv.push(['No.', 'Date', 'Day', 'Status', 'Check-In', 'Check-Out', 'Hours Worked', 'Work Volume', 'Notes']);
-
-  const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-  records.forEach((r, idx) => {
-    const parts = r.date.split('-').map(Number);
-    const dateObj = new Date(parts[0], parts[1] - 1, parts[2]);
-    const dayName = DAYS[dateObj.getDay()];
-    const hours = (r.hours_worked && r.hours_worked > 0) ? r.hours_worked : (r.check_in && r.check_out ? calculateHoursJS(r.check_in, r.check_out) : 0);
-    const rowNum = _lookupDateSortDir === 'desc' ? (records.length - idx) : (idx + 1);
-
-    csv.push([
-      rowNum,
-      r.date,
-      dayName,
-      r.status || 'Absent',
-      r.check_in || '—',
-      r.check_out || '—',
-      hours > 0 ? hours : 0,
-      r.work_volume || '—',
-      r.notes || '—'
-    ]);
-  });
-
-  csv.push([]);
-  csv.push(['', '', '', 'TOTAL', '', '', `${data.total_hours || 0} hrs`, '', '']);
-
-  const csvContent = csv.map(row => row.map(clean).join(',')).join('\n');
-  const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  const workerSlug = (w.name || 'Worker').replace(/[^a-zA-Z0-9]/g, '_');
-  link.setAttribute('href', url);
-  link.setAttribute('download', `Attendance_History_${workerSlug}_${startDate || 'ALL'}_${endDate || 'TODAY'}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
 
 // Export / Print Worker Attendance History to PDF
 function exportWorkerAttendancePDF() {
@@ -891,11 +808,467 @@ function exportWorkerAttendancePDF() {
   }, 500);
 }
 
+// ==========================================
+// BULK WORKER ATTENDANCE HISTORY & MATRIX
+// ==========================================
+let _bulkAttendanceHistoryMode = 'individual';
+let _lastBulkMatrixData = null;
+let _selectedBulkWorkerIds = new Set();
+
+function switchAttendanceHistoryMode(mode) {
+  _bulkAttendanceHistoryMode = mode;
+  const tabInd = document.getElementById('modeTabIndividual');
+  const tabBulk = document.getElementById('modeTabBulk');
+  const viewInd = document.getElementById('attendanceModeIndividual');
+  const viewBulk = document.getElementById('attendanceModeBulk');
+
+  if (mode === 'bulk') {
+    tabInd?.classList.remove('active');
+    tabBulk?.classList.add('active');
+    if (viewInd) viewInd.style.display = 'none';
+    if (viewBulk) viewBulk.style.display = 'block';
+
+    initBulkAttendanceMode();
+  } else {
+    tabBulk?.classList.remove('active');
+    tabInd?.classList.add('active');
+    if (viewBulk) viewBulk.style.display = 'none';
+    if (viewInd) viewInd.style.display = 'block';
+  }
+}
+
+async function initBulkAttendanceMode() {
+  const startEl = document.getElementById('bulkLookupStartDate');
+  const endEl = document.getElementById('bulkLookupEndDate');
+
+  if (startEl && !startEl.value) {
+    startEl.value = get16thCycleStartDate();
+  }
+  if (endEl && !endEl.value) {
+    endEl.value = getLocalDateString(new Date());
+  }
+
+  try {
+    if (!window._projectsData) {
+      window._projectsData = await apiFetch('/projects');
+    }
+    if (!window._groupsData) {
+      window._groupsData = await apiFetch('/groups');
+    }
+    if (!window._workersData) {
+      window._workersData = await apiFetch('/workers');
+    }
+  } catch (e) {
+    console.error('Error fetching dropdown options for bulk attendance:', e);
+  }
+
+  const projSelect = document.getElementById('bulkLookupProjectSelect');
+  if (projSelect) {
+    const curVal = projSelect.value || 'All';
+    let opts = '<option value="All">All Projects</option>';
+    if (window._projectsData && window._projectsData.length) {
+      opts += window._projectsData.map(p => `<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`).join('');
+    }
+    projSelect.innerHTML = opts;
+    projSelect.value = curVal;
+  }
+
+  const groupSelect = document.getElementById('bulkLookupGroupSelect');
+  if (groupSelect) {
+    const curVal = groupSelect.value || 'All';
+    let opts = '<option value="All">All Groups</option>';
+    if (window._groupsData && window._groupsData.length) {
+      opts += window._groupsData.map(g => `<option value="${escapeHtml(g.name)}">${escapeHtml(g.name)}</option>`).join('');
+    }
+    groupSelect.innerHTML = opts;
+    groupSelect.value = curVal;
+  }
+
+  renderBulkWorkerList();
+}
+
+function onBulkFilterChange() {
+  renderBulkWorkerList();
+}
+
+function renderBulkWorkerList(searchQuery = '') {
+  const pFilter = document.getElementById('bulkLookupProjectSelect')?.value || 'All';
+  const gFilter = document.getElementById('bulkLookupGroupSelect')?.value || 'All';
+  const q = searchQuery.toLowerCase().trim();
+
+  const container = document.getElementById('bulkWpList');
+  if (!container) return;
+
+  let workers = Array.isArray(window._workersData) ? window._workersData : [];
+  if (pFilter !== 'All') {
+    workers = workers.filter(w => (w.project_name || '') === pFilter);
+  }
+  if (gFilter !== 'All') {
+    workers = workers.filter(w => (w.group_name || '') === gFilter);
+  }
+  if (q) {
+    workers = workers.filter(w => 
+      (w.name || '').toLowerCase().includes(q) || 
+      (w.passport_number || '').toLowerCase().includes(q)
+    );
+  }
+
+  if (workers.length === 0) {
+    container.innerHTML = '<div style="padding:0.5rem; color:var(--text-muted); text-align:center; font-size:0.82rem;">No matching workers found</div>';
+    updateBulkWorkerPickerText();
+    return;
+  }
+
+  let html = '';
+  workers.forEach(w => {
+    const isChecked = _selectedBulkWorkerIds.size === 0 || _selectedBulkWorkerIds.has(w.id);
+    html += `
+      <label class="bulk-worker-item">
+        <input type="checkbox" value="${w.id}" ${isChecked ? 'checked' : ''} onchange="toggleBulkWorkerSelection('${w.id}', this.checked)">
+        <span style="font-weight:600;">${escapeHtml(w.name)}</span>
+        <span style="font-size:0.75rem; color:var(--text-muted); margin-left:auto;">${escapeHtml(w.passport_number || '')}</span>
+      </label>
+    `;
+  });
+  container.innerHTML = html;
+  updateBulkWorkerPickerText();
+}
+
+function toggleBulkWorkerSelection(wid, isChecked) {
+  if (isChecked) {
+    _selectedBulkWorkerIds.add(wid);
+  } else {
+    _selectedBulkWorkerIds.delete(wid);
+  }
+  updateBulkWorkerPickerText();
+}
+
+function selectAllBulkWorkers(selectState) {
+  const container = document.getElementById('bulkWpList');
+  if (!container) return;
+  const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+  checkboxes.forEach(cb => {
+    cb.checked = selectState;
+    if (selectState) {
+      _selectedBulkWorkerIds.add(cb.value);
+    } else {
+      _selectedBulkWorkerIds.delete(cb.value);
+    }
+  });
+  updateBulkWorkerPickerText();
+}
+
+function updateBulkWorkerPickerText() {
+  const textEl = document.getElementById('bulkWorkerPickerText');
+  if (!textEl) return;
+  const total = (window._workersData || []).length;
+  const selectedCount = _selectedBulkWorkerIds.size;
+
+  if (selectedCount === 0 || selectedCount === total) {
+    textEl.textContent = 'All Workers Selected';
+  } else {
+    textEl.textContent = `${selectedCount} Workers Selected`;
+  }
+}
+
+function toggleBulkWorkerPicker(e) {
+  e.stopPropagation();
+  const panel = document.getElementById('bulkWorkerPickerPanel');
+  const trigger = document.getElementById('bulkWorkerPickerTrigger');
+  if (!panel) return;
+
+  const isOpen = panel.classList.contains('wp-open') || panel.style.display === 'block';
+
+  if (isOpen) {
+    panel.classList.remove('wp-open');
+    panel.style.display = 'none';
+    trigger?.classList.remove('wp-active');
+  } else {
+    if (!window._workersData) {
+      initBulkAttendanceMode();
+    } else {
+      renderBulkWorkerList();
+    }
+    panel.style.display = 'block';
+    panel.classList.add('wp-open');
+    trigger?.classList.add('wp-active');
+    document.addEventListener('click', closeBulkWorkerPickerOutside);
+  }
+}
+
+function closeBulkWorkerPickerOutside(e) {
+  const picker = document.getElementById('bulkWorkerPicker');
+  if (picker && !picker.contains(e.target)) {
+    const panel = document.getElementById('bulkWorkerPickerPanel');
+    const trigger = document.getElementById('bulkWorkerPickerTrigger');
+    if (panel) {
+      panel.classList.remove('wp-open');
+      panel.style.display = 'none';
+    }
+    if (trigger) trigger.classList.remove('wp-active');
+    document.removeEventListener('click', closeBulkWorkerPickerOutside);
+  }
+}
+
+function filterBulkWorkerPicker(q) {
+  renderBulkWorkerList(q);
+}
+
+
+async function lookupBulkWorkerDetails() {
+  const pFilter = document.getElementById('bulkLookupProjectSelect')?.value || 'All';
+  const gFilter = document.getElementById('bulkLookupGroupSelect')?.value || 'All';
+  const startDate = document.getElementById('bulkLookupStartDate')?.value || '';
+  const endDate = document.getElementById('bulkLookupEndDate')?.value || '';
+
+  const resultEl = document.getElementById('bulkWorkerResult');
+  const emptyEl = document.getElementById('bulkWorkerEmpty');
+  const placeholderEl = document.getElementById('bulkWorkerPlaceholder');
+
+  resultEl.style.display = 'none';
+  emptyEl.style.display = 'none';
+  placeholderEl.style.display = 'none';
+
+  try {
+    const params = [];
+    if (startDate) params.push(`start_date=${startDate}`);
+    if (endDate) params.push(`end_date=${endDate}`);
+    if (pFilter !== 'All') params.push(`project_name=${encodeURIComponent(pFilter)}`);
+    if (gFilter !== 'All') params.push(`group_name=${encodeURIComponent(gFilter)}`);
+
+    if (_selectedBulkWorkerIds.size > 0) {
+      params.push(`worker_ids=${Array.from(_selectedBulkWorkerIds).join(',')}`);
+    }
+
+    const url = `/attendance/bulk-history` + (params.length ? '?' + params.join('&') : '');
+    const data = await apiFetch(url);
+    _lastBulkMatrixData = data;
+
+    const workers = data.workers || [];
+    const dates = data.dates || [];
+    const matrix = data.matrix || {};
+
+    if (workers.length === 0 || dates.length === 0) {
+      emptyEl.style.display = 'flex';
+      return;
+    }
+
+    const startFmt = data.start_date.split('-').reverse().join('.');
+    const endFmt = data.end_date.split('-').reverse().join('.');
+    document.getElementById('bulkMatrixSummaryText').innerHTML = `
+      <i class="fa-solid fa-layer-group" style="color:var(--accent-gold); margin-right:6px;"></i>
+      <span>${escapeHtml(data.banner)}</span>
+      <span style="margin: 0 8px; opacity:0.4;">|</span>
+      <span>${workers.length} Workers</span>
+      <span style="margin: 0 8px; opacity:0.4;">|</span>
+      <span>${dates.length} Days (${startFmt} - ${endFmt})</span>
+      <span style="margin: 0 8px; opacity:0.4;">|</span>
+      <span style="color:#D97706; font-weight:700;">${data.grand_total_hours} Total Hours</span>
+    `;
+
+    const totalCols = 4 + dates.length;
+    let theadHtml = `
+      <tr>
+        <th style="width:45px;">NO.</th>
+        <th style="min-width:180px; text-align:left;">NAME</th>
+        <th style="min-width:120px;">PASSPORT No.</th>
+        ${dates.map(d => `<th class="${d.is_sunday ? 'th-sunday' : ''}">${d.formatted}<br>${d.day}</th>`).join('')}
+        <th style="min-width:110px; background-color:#FEF08A; color:#713F12;">TOTAL HOURS</th>
+      </tr>
+      <tr class="banner-row">
+        <th colspan="${totalCols}">${escapeHtml(data.banner)}</th>
+      </tr>
+    `;
+    document.getElementById('bulkMatrixThead').innerHTML = theadHtml;
+
+    let tbodyHtml = '';
+    workers.forEach((w, idx) => {
+      const wid = w.id;
+      const w_data = matrix[wid] || { daily_hours: {}, total_hours: 0 };
+      const d_hours = w_data.daily_hours || {};
+      const tot = w_data.total_hours || 0;
+
+      const dailyCells = dates.map(d => {
+        const val = d_hours[d.date] || 0;
+        const valDisplay = val > 0 ? (Number.isInteger(val) ? val : val.toFixed(1)) : '0';
+        return `<td class="${d.is_sunday ? 'td-sunday' : ''}">${valDisplay}</td>`;
+      }).join('');
+
+      const totDisplay = Number.isInteger(tot) ? tot : tot.toFixed(1);
+
+      tbodyHtml += `
+        <tr>
+          <td class="col-no">${idx + 1}</td>
+          <td class="col-name">${escapeHtml((w.name || '').toUpperCase())}</td>
+          <td class="col-passport">${escapeHtml(w.passport_number || '—')}</td>
+          ${dailyCells}
+          <td class="col-total">${totDisplay}</td>
+        </tr>
+      `;
+    });
+    document.getElementById('bulkMatrixTbody').innerHTML = tbodyHtml;
+
+    resultEl.style.display = 'block';
+  } catch (err) {
+    console.error('Bulk lookup error:', err);
+    emptyEl.style.display = 'flex';
+  }
+}
+
+async function exportBulkAttendanceExcel() {
+  if (!_lastBulkMatrixData) {
+    alert("Please generate matrix first before exporting.");
+    return;
+  }
+  const data = _lastBulkMatrixData;
+  const pFilter = document.getElementById('bulkLookupProjectSelect')?.value || 'All';
+  const gFilter = document.getElementById('bulkLookupGroupSelect')?.value || 'All';
+
+  const body = {
+    start_date: data.start_date,
+    end_date: data.end_date,
+    project_name: pFilter,
+    group_name: gFilter,
+    title_banner: data.banner
+  };
+
+  if (_selectedBulkWorkerIds.size > 0) {
+    body.worker_ids = Array.from(_selectedBulkWorkerIds);
+  }
+
+  try {
+    const token = authToken || localStorage.getItem('token');
+    const res = await fetch('/api/attendance/export-bulk-excel', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      throw new Error('Export failed');
+    }
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Worker_Attendance_Matrix_${data.start_date}_to_${data.end_date}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error('Excel export error:', err);
+    alert('Failed to export Excel file. Please try again.');
+  }
+}
+
+
+
+function exportBulkAttendancePDF() {
+  if (!_lastBulkMatrixData) {
+    alert("Please generate matrix first before printing.");
+    return;
+  }
+  const data = _lastBulkMatrixData;
+  const workers = data.workers || [];
+  const dates = data.dates || [];
+  const matrix = data.matrix || {};
+
+  const printWin = window.open('', '_blank');
+  if (!printWin) {
+    alert("Pop-up blocked. Please allow pop-ups to print PDF.");
+    return;
+  }
+
+  const dateThs = dates.map(d => `<th class="${d.is_sunday ? 'sun-header' : ''}">${d.formatted}<br>${d.day}</th>`).join('');
+
+  let rowsHtml = '';
+  workers.forEach((w, idx) => {
+    const wid = w.id;
+    const w_data = matrix[wid] || { daily_hours: {}, total_hours: 0 };
+    const d_hours = w_data.daily_hours || {};
+    const tot = w_data.total_hours || 0;
+
+    const dailyCells = dates.map(d => {
+      const val = d_hours[d.date] || 0;
+      const valDisplay = val > 0 ? (Number.isInteger(val) ? val : val.toFixed(1)) : '0';
+      return `<td class="${d.is_sunday ? 'sun-cell' : ''}">${valDisplay}</td>`;
+    }).join('');
+
+    rowsHtml += `
+      <tr>
+        <td style="text-align:center;">${idx + 1}</td>
+        <td class="name-cell">${escapeHtml((w.name || '').toUpperCase())}</td>
+        <td style="text-align:center;">${escapeHtml(w.passport_number || '—')}</td>
+        ${dailyCells}
+        <td class="total-cell">${tot}</td>
+      </tr>
+    `;
+  });
+
+  const totalCols = 4 + dates.length;
+
+  printWin.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Attendance Matrix Report</title>
+      <style>
+        @page { size: A4 landscape; margin: 10mm; }
+        body { font-family: Arial, sans-serif; font-size: 10px; color: #000; margin: 0; padding: 10px; }
+        .title { font-size: 16px; font-weight: bold; color: #1F497D; }
+        .subtitle { font-size: 12px; font-weight: bold; color: #595959; margin-bottom: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 9px; }
+        th, td { border: 1px solid #999; padding: 4px 5px; text-align: center; }
+        th { background: #F2F2F2; font-weight: bold; }
+        .sun-header { color: #DC2626 !important; background: #FEF2F2 !important; }
+        .sun-cell { color: #DC2626; font-weight: bold; }
+        .banner-row { background: #E2E8F0 !important; font-size: 11px; font-weight: bold; }
+        .name-cell { text-align: left; font-weight: bold; background: #D9E1F2; }
+        .total-cell { font-weight: bold; background: #FFFF00; }
+      </style>
+    </head>
+    <body>
+      <div class="title">MOHAMMAD CONSTRUCTION & ENGINEERING SDN.BHD.</div>
+      <div class="subtitle">WORKER ATTENDANCE HISTORY REPORT (Period: ${data.start_date} to ${data.end_date})</div>
+      
+      <table>
+        <thead>
+          <tr>
+            <th>NO.</th>
+            <th style="text-align:left;">NAME</th>
+            <th>PASSPORT No.</th>
+            ${dateThs}
+            <th style="background:#FFFF00;">TOTAL HOURS</th>
+          </tr>
+          <tr class="banner-row">
+            <th colspan="${totalCols}">${escapeHtml(data.banner)}</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+    </body>
+    </html>
+  `);
+
+  printWin.document.close();
+  printWin.focus();
+  setTimeout(() => { printWin.print(); }, 500);
+}
+
 // Option Loader Helpers
 async function loadProjectOptions() {
+
   try {
     const projects = await apiFetch('/projects');
-    const selects = ['attendanceProjectFilter', 'workerProjectFilter', 'workerProject', 'reportProjectFilter'];
+    const selects = ['attendanceProjectFilter', 'workerProjectFilter', 'workerProject'];
+
     const isSiteManagerHasProj = currentUser && currentUser.role === 'site_manager' && currentUser.assigned_project_id;
 
     selects.forEach(id => {
@@ -926,7 +1299,8 @@ async function loadProjectOptions() {
 async function loadGroupOptions() {
   try {
     const groups = await apiFetch('/groups');
-    const selects = ['attendanceGroupFilter', 'workerGroupFilter', 'workerGroup', 'reportGroupFilter'];
+    const selects = ['attendanceGroupFilter', 'workerGroupFilter', 'workerGroup'];
+
     selects.forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
@@ -2284,7 +2658,7 @@ async function openUserModal(user = null) {
 
   await populateUserModalProjects(user ? (user.assigned_project_id || '') : '');
 
-  const defaultTabs = ['dashboard', 'attendance', 'workers', 'projects', 'groups', 'reports'];
+  const defaultTabs = ['dashboard', 'attendance', 'workers', 'projects', 'groups'];
   const userTabs = (user && user.allowed_tabs) ? user.allowed_tabs : defaultTabs;
 
   document.querySelectorAll('.tab-perm-checkbox').forEach(cb => {
@@ -2393,103 +2767,6 @@ async function deleteUser(username) {
   }
 }
 
-// Reports & CSV Export
-async function loadReportTable() {
-  const todayStr = getLocalDateString(new Date());
-  const startEl = document.getElementById('reportStartDate');
-  const endEl = document.getElementById('reportEndDate');
-  if (startEl) {
-    startEl.max = todayStr;
-    if (startEl.value > todayStr) startEl.value = todayStr;
-  }
-  if (endEl) {
-    endEl.max = todayStr;
-    if (endEl.value > todayStr) endEl.value = todayStr;
-  }
-
-  const startDate = startEl?.value || '';
-  const endDate = endEl?.value || '';
-  const projectId = document.getElementById('reportProjectFilter')?.value || '';
-  const groupId = document.getElementById('reportGroupFilter')?.value || '';
-
-  try {
-    const data = await apiFetch(`/reports/payroll?start_date=${startDate}&end_date=${endDate}&project_id=${projectId}&group_id=${groupId}`);
-    const tbody = document.getElementById('reportTableBody');
-    tbody.innerHTML = '';
-
-    const summaryWorkersEl = document.getElementById('reportTotalWorkers');
-    const summaryDaysEl = document.getElementById('reportTotalDays');
-    const summaryHoursEl = document.getElementById('reportTotalHours');
-
-    if (summaryWorkersEl) summaryWorkersEl.innerText = data.total_workers || 0;
-    if (summaryDaysEl) summaryDaysEl.innerText = `${data.total_days_worked || 0} days`;
-    if (summaryHoursEl) summaryHoursEl.innerText = `${data.total_hours || 0} hrs`;
-
-    if (!data.records || data.records.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:2rem; color:var(--text-muted);">No construction workers found matching filters.</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = data.records.map(item => {
-      const w = item.worker;
-      const daysWorked = item.days_worked || 0;
-      const totalHours = item.total_hours || 0;
-      const statusClass = daysWorked > 0 ? 'badge-present' : 'badge-pending';
-      const statusLabel = daysWorked > 0 ? `${daysWorked} Days Worked` : 'No Hours Logged';
-
-      return `
-        <tr>
-          <td>
-            <div style="font-weight:600; color:var(--primary); font-size:0.95rem;">${escapeHtml(w.name)}</div>
-            <div style="font-size:0.7rem; font-weight:500; color:var(--text-muted); opacity:0.85; margin-top:1px;"><i class="fa-solid fa-id-card" style="font-size:0.65rem;"></i> ${escapeHtml(w.passport_number || 'N/A')}</div>
-          </td>
-          <td>
-            <div style="font-size:0.85rem; font-weight:600;">${escapeHtml(w.project_name || 'Unassigned')}</div>
-            <div style="font-size:0.75rem; color:var(--text-muted);">${escapeHtml(w.group_name || 'General')}</div>
-          </td>
-          <td><strong>${daysWorked} days</strong></td>
-          <td><strong style="color:var(--accent-amber); font-size:1.05rem;">${totalHours} hrs</strong></td>
-          <td><span style="font-size:0.85rem; font-weight:600; color:var(--primary);">${escapeHtml(item.work_volume_summary) || '<span style="color:var(--text-muted); font-weight:normal;">-</span>'}</span></td>
-          <td><span class="badge ${statusClass}">${statusLabel}</span></td>
-        </tr>
-      `;
-    }).join('');
-  } catch (err) { console.error("Report load error", err); }
-}
-
-async function exportAttendanceCSV() {
-  const startDate = document.getElementById('reportStartDate')?.value || '';
-  const endDate = document.getElementById('reportEndDate')?.value || '';
-  const projectId = document.getElementById('reportProjectFilter')?.value || '';
-  const groupId = document.getElementById('reportGroupFilter')?.value || '';
-
-  try {
-    const data = await apiFetch(`/reports/payroll?start_date=${startDate}&end_date=${endDate}&project_id=${projectId}&group_id=${groupId}`);
-    let csv = "Worker Name,Passport Number,Project Name,Group,Days Worked,Total Hours Worked,Total Work Volume,Status\n";
-
-    data.records.forEach(item => {
-      const w = item.worker;
-      const daysWorked = item.days_worked || 0;
-      const totalHours = item.total_hours || 0;
-      const statusLabel = daysWorked > 0 ? `${daysWorked} Days Worked` : 'No Hours Logged';
-
-      csv += `"${(w.name || '').replace(/"/g, '""')}","${(w.passport_number || '').replace(/"/g, '""')}","${(w.project_name || '').replace(/"/g, '""')}","${(w.group_name || '').replace(/"/g, '""')}","${daysWorked}","${totalHours}","${(item.work_volume_summary || '').replace(/"/g, '""')}","${statusLabel}"\n`;
-    });
-
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    const fileName = (startDate && endDate) ? `Payroll_Summary_${startDate}_to_${endDate}.csv` : `Payroll_Summary_${startDate || endDate || 'export'}.csv`;
-    link.setAttribute("download", fileName);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  } catch (err) {
-    alert("Export failed: " + err.message);
-  }
-}
 
 // Utility Modal Closes
 function closeModal(modalId) {

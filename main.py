@@ -2,19 +2,25 @@ import os
 import urllib.request
 import pickle
 import base64
-import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Depends, Query, status, Response
+import io
+from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime, date, timezone, timedelta
 from bson import ObjectId
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+
 
 from database import get_db, init_db, verify_password, hash_password
 from auth import create_access_token, get_current_user, require_admin
+
 
 
 MODEL_FILES = [
@@ -176,6 +182,15 @@ class BulkCheckOutRequest(BaseModel):
     check_out_time: str # HH:MM
     admin_confirmed: Optional[bool] = False
 
+class BulkAttendanceExportRequest(BaseModel):
+    worker_ids: Optional[List[str]] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    project_name: Optional[str] = None
+    group_name: Optional[str] = None
+    title_banner: Optional[str] = None
+
+
 class PhotoUploadRequest(BaseModel):
     worker_id: Optional[str] = ""
     image_data: str
@@ -207,7 +222,7 @@ def login(req: LoginRequest):
             "phone": user.get("phone", ""),
             "assigned_project_id": user.get("assigned_project_id", ""),
             "assigned_project_name": user.get("assigned_project_name", ""),
-            "allowed_tabs": user.get("allowed_tabs", ["dashboard", "face-scanner", "attendance", "workers", "projects", "groups", "reports"])
+            "allowed_tabs": user.get("allowed_tabs", ["dashboard", "face-scanner", "attendance", "workers", "projects", "groups"])
         }
     }
 
@@ -886,111 +901,303 @@ def get_worker_attendance_history(
         "days_worked": days_worked
     }
 
-@app.get("/api/reports/payroll")
-def get_payroll_report(
-    start_date: Optional[str] = Query(None, alias="start_date"),
-    end_date: Optional[str] = Query(None, alias="end_date"),
-    project_id: Optional[str] = None,
-    group_id: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
-):
-    db = get_db()
-    
+def fetch_bulk_attendance_matrix_data(db, current_user, worker_ids=None, start_date=None, end_date=None, project_name=None, group_name=None):
     today_str = date.today().isoformat()
-    if not start_date or start_date > today_str:
+    if not start_date:
         start_date = get_16th_cycle_start_date()
-        if start_date > today_str:
-            start_date = today_str
-    if not end_date or end_date > today_str:
+    if not end_date:
         end_date = today_str
 
+    if start_date > end_date:
+        start_date = end_date
+
+    # Build worker query
+    query = {}
+    if worker_ids and len(worker_ids) > 0:
+        oids = []
+        for wid in worker_ids:
+            try: oids.append(ObjectId(wid))
+            except: pass
+        if oids:
+            query["_id"] = {"$in": oids}
+    
     if current_user.get("role") == "site_manager" and current_user.get("assigned_project_id"):
-        project_id = current_user["assigned_project_id"]
+        try:
+            query["project_id"] = current_user["assigned_project_id"]
+        except: pass
 
-    worker_filter = {}
-    if project_id: worker_filter["project_id"] = project_id
-    if group_id: worker_filter["group_id"] = group_id
+    # Fetch workers sorted by name
+    workers_cursor = db.workers.find(query).sort("name", 1)
+    workers = [serialize_doc(w) for w in workers_cursor]
 
-    workers = list(db.workers.find(worker_filter))
-    
-    projects = list(db.projects.find({}))
-    project_map = {str(p["_id"]): p.get("name", "") for p in projects}
+    # Filter further by project_name / group_name if provided
+    if project_name and project_name != "All":
+        workers = [w for w in workers if w.get("project_name") == project_name]
+    if group_name and group_name != "All":
+        workers = [w for w in workers if w.get("group_name") == group_name]
 
-    groups = list(db.groups.find({}))
-    group_map = {str(g["_id"]): g.get("name", "") for g in groups}
+    # Generate dates range
+    try:
+        dt_start = datetime.strptime(start_date, "%Y-%m-%d").date()
+        dt_end = datetime.strptime(end_date, "%Y-%m-%d").date()
+    except Exception:
+        dt_start = datetime.strptime(get_16th_cycle_start_date(), "%Y-%m-%d").date()
+        dt_end = date.today()
 
-    worker_map = {}
-    for w in workers:
-        wid = str(w["_id"])
-        w_doc = serialize_doc(w)
-        pid = str(w_doc.get("project_id", ""))
-        gid = str(w_doc.get("group_id", ""))
-        w_doc["project_name"] = project_map.get(pid) or w_doc.get("project_name", "")
-        w_doc["group_name"] = group_map.get(gid) or w_doc.get("group_name", "")
-        worker_map[wid] = w_doc
-
-    worker_ids = list(worker_map.keys())
-
-    att_query = {
-        "date": {"$gte": start_date, "$lte": end_date},
-        "worker_id": {"$in": worker_ids}
-    }
-    
-    records = list(db.attendance.find(att_query))
-
-    # Aggregate attendance records per worker
-    attendance_by_worker = {wid: [] for wid in worker_ids}
-    for att in records:
-        wid = att.get("worker_id")
-        if wid in attendance_by_worker:
-            att_doc = serialize_doc(att)
-            if att_doc.get("check_in") and att_doc.get("check_out"):
-                att_doc["hours_worked"] = calculate_hours(att_doc["check_in"], att_doc["check_out"])
-            attendance_by_worker[wid].append(att_doc)
-
-    summary_list = []
-    grand_total_hours = 0.0
-    total_days_worked = 0
-
-    for wid, wdata in worker_map.items():
-        att_list = attendance_by_worker.get(wid, [])
-        worker_hours = 0.0
-        days_worked = 0
-        volumes = []
-
-        for att in att_list:
-            hrs = float(att.get("hours_worked") or 0.0)
-            st = att.get("status", "")
-            worker_hours += hrs
-            if hrs > 0 or st in ["Present", "Late", "Half-Day"] or att.get("check_in"):
-                days_worked += 1
-            vol = str(att.get("work_volume") or "").strip()
-            if vol:
-                volumes.append(vol)
-
-        worker_hours = round(worker_hours, 2)
-        grand_total_hours += worker_hours
-        total_days_worked += days_worked
-
-        summary_list.append({
-            "worker": wdata,
-            "days_worked": days_worked,
-            "total_hours": worker_hours,
-            "work_volume_summary": ", ".join(volumes) if volumes else "",
-            "records_count": len(att_list)
+    DAYS_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    dates = []
+    curr = dt_start
+    while curr <= dt_end:
+        iso_str = curr.isoformat()
+        day_idx = curr.weekday() # 0 = Mon, 6 = Sun
+        day_str = DAYS_SHORT[day_idx]
+        fmt_str = curr.strftime("%d.%m.%Y")
+        is_sun = (day_idx == 6)
+        dates.append({
+            "date": iso_str,
+            "formatted": fmt_str,
+            "day": day_str,
+            "header": f"{fmt_str}, {day_str}",
+            "is_sunday": is_sun
         })
+        curr += timedelta(days=1)
 
-    # Sort summary list by total_hours descending, then worker name
-    summary_list.sort(key=lambda x: (-x["total_hours"], x["worker"]["name"]))
+    target_worker_ids = [w["id"] for w in workers if "id" in w]
+
+    # Query attendance records for these workers and date range
+    att_cursor = db.attendance.find({
+        "worker_id": {"$in": target_worker_ids},
+        "date": {"$gte": start_date, "$lte": end_date}
+    })
+    att_records = [serialize_doc(r) for r in att_cursor]
+
+    # Map attendance: worker_id -> date -> hours_worked
+    att_map = {}
+    for r in att_records:
+        wid = r.get("worker_id")
+        d = r.get("date")
+        if not wid or not d:
+            continue
+        if wid not in att_map:
+            att_map[wid] = {}
+        
+        h = float(r.get("hours_worked") or 0.0)
+        if h <= 0 and r.get("check_in") and r.get("check_out"):
+            h = calculate_hours(r.get("check_in"), r.get("check_out"))
+        att_map[wid][d] = h
+
+    # Build matrix per worker
+    matrix = {}
+    grand_total_hours = 0.0
+    for w in workers:
+        wid = w["id"]
+        w_hours_map = att_map.get(wid, {})
+        daily_hours = {}
+        row_total = 0.0
+        for d_info in dates:
+            d_str = d_info["date"]
+            h = float(w_hours_map.get(d_str, 0.0))
+            daily_hours[d_str] = round(h, 2)
+            row_total += h
+        
+        row_total = round(row_total, 2)
+        grand_total_hours += row_total
+        matrix[wid] = {
+            "daily_hours": daily_hours,
+            "total_hours": row_total
+        }
+
+    p_title = project_name if (project_name and project_name != "All") else ""
+    g_title = group_name if (group_name and group_name != "All") else ""
+    if g_title and p_title:
+        banner = f"{g_title} - {p_title}"
+    elif g_title:
+        banner = g_title
+    elif p_title:
+        banner = p_title
+    else:
+        banner = "All Groups & Projects"
 
     return {
         "start_date": start_date,
         "end_date": end_date,
-        "total_workers": len(summary_list),
-        "total_days_worked": total_days_worked,
-        "total_hours": round(grand_total_hours, 2),
-        "records": summary_list
+        "banner": banner,
+        "dates": dates,
+        "workers": workers,
+        "matrix": matrix,
+        "grand_total_hours": round(grand_total_hours, 2)
     }
+
+@app.get("/api/attendance/bulk-history")
+def get_bulk_attendance_history(
+    worker_ids: Optional[str] = Query(None),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    project_name: Optional[str] = Query(None),
+    group_name: Optional[str] = Query(None),
+    current_user: dict = Depends(get_current_user)
+):
+    db = get_db()
+    w_list = [w.strip() for w in worker_ids.split(",") if w.strip()] if worker_ids else None
+    return fetch_bulk_attendance_matrix_data(db, current_user, w_list, start_date, end_date, project_name, group_name)
+
+@app.post("/api/attendance/export-bulk-excel")
+def export_bulk_attendance_excel(
+    req: BulkAttendanceExportRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    db = get_db()
+    data = fetch_bulk_attendance_matrix_data(
+        db, current_user,
+        worker_ids=req.worker_ids,
+        start_date=req.start_date,
+        end_date=req.end_date,
+        project_name=req.project_name,
+        group_name=req.group_name
+    )
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Attendance Matrix"
+    ws.views.sheetView[0].showGridLines = True
+
+    font_title = Font(name="Calibri", size=14, bold=True, color="1F497D")
+    font_subtitle = Font(name="Calibri", size=11, bold=True, color="595959")
+    font_header_normal = Font(name="Calibri", size=9, bold=True, color="000000")
+    font_header_sunday = Font(name="Calibri", size=9, bold=True, color="FF0000")
+    font_banner = Font(name="Calibri", size=11, bold=True, color="000000")
+    font_worker_name = Font(name="Calibri", size=10, bold=True, color="000000")
+    font_data_normal = Font(name="Calibri", size=10, color="000000")
+    font_data_sunday = Font(name="Calibri", size=10, color="FF0000")
+    font_total = Font(name="Calibri", size=10, bold=True, color="000000")
+
+    fill_header = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
+    fill_worker_name = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+    fill_banner = PatternFill(start_color="E9EEF4", end_color="E9EEF4", fill_type="solid")
+    fill_total = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+
+    thin_border_side = Side(border_style="thin", color="BFBFBF")
+    thin_border = Border(left=thin_border_side, right=thin_border_side, top=thin_border_side, bottom=thin_border_side)
+
+    align_center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    align_left = Alignment(horizontal="left", vertical="center")
+
+    ws.merge_cells("A1:D1")
+    ws["A1"] = "MOHAMMAD CONSTRUCTION & ENGINEERING SDN.BHD."
+    ws["A1"].font = font_title
+
+    ws.merge_cells("A2:D2")
+    ws["A2"] = "WORKER ATTENDANCE HISTORY REPORT"
+    ws["A2"].font = font_subtitle
+
+    start_fmt = datetime.strptime(data["start_date"], "%Y-%m-%d").strftime("%d.%m.%Y")
+    end_fmt = datetime.strptime(data["end_date"], "%Y-%m-%d").strftime("%d.%m.%Y")
+    ws.merge_cells("A3:D3")
+    ws["A3"] = f"Period: {start_fmt} to {end_fmt}"
+    ws["A3"].font = font_subtitle
+
+    row_header = 5
+    ws.cell(row=row_header, column=1, value="NO.").alignment = align_center
+    ws.cell(row=row_header, column=2, value="NAME").alignment = align_left
+    ws.cell(row=row_header, column=3, value="PASSPORT No.").alignment = align_center
+
+    dates = data["dates"]
+    for i, d_info in enumerate(dates):
+        c_idx = 4 + i
+        cell = ws.cell(row=row_header, column=c_idx, value=d_info["header"])
+        cell.alignment = align_center
+        cell.font = font_header_sunday if d_info["is_sunday"] else font_header_normal
+        cell.fill = fill_header
+        cell.border = thin_border
+
+    total_col_idx = 4 + len(dates)
+    cell_tot_h = ws.cell(row=row_header, column=total_col_idx, value="TOTAL HOURS")
+    cell_tot_h.alignment = align_center
+    cell_tot_h.font = font_total
+    cell_tot_h.fill = fill_header
+    cell_tot_h.border = thin_border
+
+    for col in range(1, 4):
+        c = ws.cell(row=row_header, column=col)
+        c.font = font_header_normal
+        c.fill = fill_header
+        c.border = thin_border
+
+    banner_row = 6
+    banner_text = req.title_banner or data["banner"]
+    last_col_letter = get_column_letter(total_col_idx)
+    ws.merge_cells(f"A{banner_row}:{last_col_letter}{banner_row}")
+    b_cell = ws.cell(row=banner_row, column=1, value=banner_text)
+    b_cell.font = font_banner
+    b_cell.alignment = align_center
+    b_cell.fill = fill_banner
+    for c in range(1, total_col_idx + 1):
+        ws.cell(row=banner_row, column=c).border = thin_border
+
+    workers = data["workers"]
+    matrix = data["matrix"]
+    current_row = 7
+
+    for idx, w in enumerate(workers):
+        wid = w["id"]
+        w_data = matrix.get(wid, {"daily_hours": {}, "total_hours": 0.0})
+        daily_hours = w_data["daily_hours"]
+        tot = w_data["total_hours"]
+
+        c1 = ws.cell(row=current_row, column=1, value=idx + 1)
+        c1.alignment = align_center
+        c1.font = font_data_normal
+        c1.border = thin_border
+
+        c2 = ws.cell(row=current_row, column=2, value=str(w.get("name", "")).upper())
+        c2.alignment = align_left
+        c2.font = font_worker_name
+        c2.fill = fill_worker_name
+        c2.border = thin_border
+
+        c3 = ws.cell(row=current_row, column=3, value=w.get("passport_number") or "—")
+        c3.alignment = align_center
+        c3.font = font_data_normal
+        c3.border = thin_border
+
+        for i, d_info in enumerate(dates):
+            c_idx = 4 + i
+            d_str = d_info["date"]
+            val = daily_hours.get(d_str, 0.0)
+            val_display = int(val) if val.is_integer() else val
+            cell = ws.cell(row=current_row, column=c_idx, value=val_display)
+            cell.alignment = align_center
+            cell.font = font_data_sunday if d_info["is_sunday"] else font_data_normal
+            cell.border = thin_border
+
+        tot_display = int(tot) if isinstance(tot, (int, float)) and float(tot).is_integer() else tot
+        c_tot = ws.cell(row=current_row, column=total_col_idx, value=tot_display)
+        c_tot.alignment = align_center
+        c_tot.font = font_total
+        c_tot.fill = fill_total
+        c_tot.border = thin_border
+
+        current_row += 1
+
+    ws.column_dimensions["A"].width = 6
+    ws.column_dimensions["B"].width = 24
+    ws.column_dimensions["C"].width = 16
+    for i in range(len(dates)):
+        col_let = get_column_letter(4 + i)
+        ws.column_dimensions[col_let].width = 12
+    ws.column_dimensions[last_col_letter].width = 14
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    filename = f"Worker_Attendance_Matrix_{data['start_date']}_to_{data['end_date']}.xlsx"
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
 
 def calculate_hours(check_in_str, check_out_str):
     if not check_in_str or not check_out_str:
@@ -1381,7 +1588,7 @@ def create_user(u: UserCreate, current_user: dict = Depends(require_admin)):
         "email": u.email or "",
         "assigned_project_id": u.assigned_project_id or "",
         "assigned_project_name": proj_name or "",
-        "allowed_tabs": u.allowed_tabs if u.allowed_tabs is not None else ["dashboard", "attendance", "workers", "projects", "groups", "reports"],
+        "allowed_tabs": u.allowed_tabs if u.allowed_tabs is not None else ["dashboard", "attendance", "workers", "projects", "groups"],
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     res = db.users.insert_one(user_doc)
