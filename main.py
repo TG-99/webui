@@ -1,17 +1,66 @@
 import os
+import urllib.request
+import pickle
+import base64
+import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Depends, Query, status
+from fastapi import FastAPI, HTTPException, Depends, Query, status, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
-from datetime import datetime, date, timezone
+from datetime import datetime, date, timezone, timedelta
 from bson import ObjectId
 
 from database import get_db, init_db, verify_password, hash_password
 from auth import create_access_token, get_current_user, require_admin
 
+
+MODEL_FILES = [
+    "tiny_face_detector_model-weights_manifest.json",
+    "tiny_face_detector_model.bin",
+    "face_landmark_68_model-weights_manifest.json",
+    "face_landmark_68_model.bin",
+    "face_recognition_model-weights_manifest.json",
+    "face_recognition_model.bin",
+    "ssd_mobilenetv1_model-weights_manifest.json",
+    "ssd_mobilenetv1_model.bin"
+]
+MODEL_CDN_BASE = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model/"
+FACE_API_JS_CDN = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/dist/face-api.js"
+
+def ensure_local_models():
+    models_dir = os.path.join(os.path.dirname(__file__), "static", "models")
+    os.makedirs(models_dir, exist_ok=True)
+
+    # 1. Ensure local face-api.js library file is cached in static/models/
+    js_lib_path = os.path.join(models_dir, "face-api.js")
+    if not os.path.exists(js_lib_path) or os.path.getsize(js_lib_path) == 0:
+        try:
+            print("[Model Pre-loader] Caching face-api.js library to static/models/...")
+            req = urllib.request.Request(FACE_API_JS_CDN, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                data = resp.read()
+                with open(js_lib_path, "wb") as f:
+                    f.write(data)
+        except Exception as e:
+            print(f"[Model Pre-loader] Warning caching face-api.js: {e}")
+    
+    # 2. Ensure model weight files are cached
+    for fname in MODEL_FILES:
+        fpath = os.path.join(models_dir, fname)
+        if not os.path.exists(fpath) or os.path.getsize(fpath) == 0:
+            url = MODEL_CDN_BASE + fname
+            try:
+                print(f"[Model Pre-loader] Caching {fname} to local server...")
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    data = resp.read()
+                    with open(fpath, "wb") as f:
+                        f.write(data)
+            except Exception as e:
+                print(f"[Model Pre-loader] Warning downloading {fname}: {e}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -20,6 +69,16 @@ async def lifespan(app: FastAPI):
         print("[Startup] Database initialized successfully.")
     except Exception as e:
         print(f"[Startup Warning] Could not initialize database: {e}")
+
+    uploads_path = os.path.join(os.path.dirname(__file__), "static", "uploads")
+    os.makedirs(uploads_path, exist_ok=True)
+
+    try:
+        ensure_local_models()
+        print("[Startup] AI Face recognition models verified and cached locally on server.")
+    except Exception as e:
+        print(f"[Startup Warning] Could not cache local models: {e}")
+
     yield
 
 
@@ -89,6 +148,7 @@ class WorkerModel(BaseModel):
     name: str
     passport_number: Optional[str] = ""
     phone: Optional[str] = ""
+    hourly_rate: Optional[float] = 0.0
     project_id: Optional[str] = ""
     group_id: Optional[str] = ""
     picture_url: Optional[str] = ""
@@ -116,6 +176,10 @@ class BulkCheckOutRequest(BaseModel):
     check_out_time: str # HH:MM
     admin_confirmed: Optional[bool] = False
 
+class PhotoUploadRequest(BaseModel):
+    worker_id: Optional[str] = ""
+    image_data: str
+
 # --- Auth Routes ---
 @app.post("/api/auth/login")
 def login(req: LoginRequest):
@@ -140,10 +204,10 @@ def login(req: LoginRequest):
             "full_name": user.get("full_name", ""),
             "role": user.get("role", "site_manager"),
             "email": user.get("email", ""),
-            "phone": user.get("phone", user.get("email", "")),
+            "phone": user.get("phone", ""),
             "assigned_project_id": user.get("assigned_project_id", ""),
             "assigned_project_name": user.get("assigned_project_name", ""),
-            "allowed_tabs": user.get("allowed_tabs", ["dashboard", "attendance", "workers", "projects", "groups", "reports"])
+            "allowed_tabs": user.get("allowed_tabs", ["dashboard", "face-scanner", "attendance", "workers", "projects", "groups", "reports"])
         }
     }
 
@@ -284,6 +348,7 @@ def list_workers(
     group_id: Optional[str] = None,
     status: Optional[str] = None,
     query: Optional[str] = None,
+    photo_status: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
     db = get_db()
@@ -301,6 +366,15 @@ def list_workers(
         filter_query["$or"] = [
             {"name": {"$regex": query, "$options": "i"}},
             {"passport_number": {"$regex": query, "$options": "i"}}
+        ]
+    if photo_status == "with_photo":
+        filter_query["picture_url"] = {"$exists": True, "$ne": None, "$regex": "\\S+"}
+    elif photo_status == "without_photo":
+        filter_query["$or"] = [
+            {"picture_url": {"$exists": False}},
+            {"picture_url": None},
+            {"picture_url": ""},
+            {"picture_url": {"$regex": "^\\s*$"}}
         ]
     
     workers = list(db.workers.find(filter_query))
@@ -383,10 +457,26 @@ def update_worker(worker_id: str, worker: WorkerModel, current_user: dict = Depe
             if g: doc["group_name"] = g["name"]
         except: pass
         
-    res = db.workers.update_one({"_id": oid}, {"$set": doc})
-    if res.matched_count == 0:
+    existing_worker = db.workers.find_one({"_id": oid})
+    if not existing_worker:
         raise HTTPException(status_code=404, detail="Worker not found")
+
+    old_pic = (existing_worker.get("picture_url") or "").strip()
+    new_pic = (doc.get("picture_url") or "").strip()
+
+    res = db.workers.update_one({"_id": oid}, {"$set": doc})
     
+    # If picture_url was modified or removed, unset face_descriptor so AI engine re-indexes it
+    if old_pic != new_pic:
+        db.workers.update_one({"_id": oid}, {"$unset": {"face_descriptor": ""}})
+        try:
+            pickle_index = load_pickle_index()
+            if worker_id in pickle_index:
+                del pickle_index[worker_id]
+                save_pickle_index(pickle_index)
+        except Exception:
+            pass
+
     updated = db.workers.find_one({"_id": oid})
     return serialize_doc(updated)
 
@@ -400,7 +490,173 @@ def delete_worker(worker_id: str, current_user: dict = Depends(get_current_user)
         raise HTTPException(status_code=400, detail="Invalid Worker ID format")
     
     db.workers.delete_one({"_id": oid})
+    try:
+        pickle_index = load_pickle_index()
+        if worker_id in pickle_index:
+            del pickle_index[worker_id]
+            save_pickle_index(pickle_index)
+    except Exception:
+        pass
     return {"message": "Worker deleted successfully"}
+
+@app.post("/api/workers/upload-photo")
+def upload_worker_photo(req: PhotoUploadRequest, current_user: dict = Depends(get_current_user)):
+    if not req.image_data:
+        raise HTTPException(status_code=400, detail="Image data is required")
+        
+    try:
+        img_data = req.image_data
+        if "," in img_data:
+            img_data = img_data.split(",")[1]
+            
+        binary_data = base64.b64decode(img_data)
+        filename = f"worker_{uuid.uuid4().hex[:10]}.jpg"
+        uploads_dir = os.path.join(os.path.dirname(__file__), "static", "uploads")
+        os.makedirs(uploads_dir, exist_ok=True)
+        
+        filepath = os.path.join(uploads_dir, filename)
+        with open(filepath, "wb") as f:
+            f.write(binary_data)
+            
+        picture_url = f"/uploads/{filename}"
+        
+        if req.worker_id:
+            try:
+                db = get_db()
+                db.workers.update_one({"_id": ObjectId(req.worker_id)}, {"$set": {"picture_url": picture_url}, "$unset": {"face_descriptor": ""}})
+                pickle_index = load_pickle_index()
+                if req.worker_id in pickle_index:
+                    del pickle_index[req.worker_id]
+                    save_pickle_index(pickle_index)
+            except Exception:
+                pass
+
+        return {
+            "success": True,
+            "picture_url": picture_url,
+            "message": "Worker photo uploaded successfully"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to process photo upload: {str(e)}")
+
+@app.get("/api/proxy-image")
+def proxy_image(url: str = Query(...)):
+    if not url or not url.strip():
+        raise HTTPException(status_code=400, detail="URL parameter is required")
+    try:
+        req = urllib.request.Request(url.strip(), headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            content_type = resp.headers.get("Content-Type", "image/jpeg")
+            data = resp.read()
+            return Response(content=data, media_type=content_type, headers={
+                "Cache-Control": "public, max-age=86400, immutable",
+                "Access-Control-Allow-Origin": "*"
+            })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to proxy image: {str(e)}")
+
+# ── Index.pickle Local Cache Helpers & Endpoints ──────────────────────────────
+INDEX_PICKLE_PATH = os.path.join(os.path.dirname(__file__), "index.pickle")
+
+def load_pickle_index() -> dict:
+    if os.path.exists(INDEX_PICKLE_PATH):
+        try:
+            with open(INDEX_PICKLE_PATH, "rb") as f:
+                data = pickle.load(f)
+                if isinstance(data, dict):
+                    return data
+        except Exception as e:
+            print(f"[Pickle Index] Warning loading index.pickle: {e}")
+    return {}
+
+def save_pickle_index(index_data: dict):
+    try:
+        with open(INDEX_PICKLE_PATH, "wb") as f:
+            pickle.dump(index_data, f)
+    except Exception as e:
+        print(f"[Pickle Index] Error saving index.pickle: {e}")
+
+class DescriptorCacheRequest(BaseModel):
+    worker_id: str
+    descriptor: List[float]
+
+@app.get("/api/face-descriptors")
+def get_face_descriptors(current_user: dict = Depends(get_current_user)):
+    try:
+        db = get_db()
+        workers = list(db.workers.find({"status": {"$ne": "Terminated"}}))
+        pickle_index = load_pickle_index()
+        dirty_pickle = False
+
+        result = []
+        for w in workers:
+            w_id = str(w["_id"])
+            w["id"] = w_id
+            del w["_id"]
+
+            pic_url = (w.get("picture_url") or "").strip()
+
+            # If photo was removed or is empty, worker MUST NOT have an indexed face descriptor!
+            if not pic_url:
+                descriptor = None
+                if w_id in pickle_index:
+                    del pickle_index[w_id]
+                    dirty_pickle = True
+                if "face_descriptor" in w:
+                    db.workers.update_one({"_id": ObjectId(w_id)}, {"$unset": {"face_descriptor": ""}})
+            else:
+                descriptor = pickle_index.get(w_id)
+                if not descriptor and "face_descriptor" in w and w["face_descriptor"]:
+                    descriptor = w["face_descriptor"]
+                    pickle_index[w_id] = descriptor
+                    dirty_pickle = True
+
+            result.append({
+                "worker": w,
+                "imgUrl": pic_url,
+                "name": w.get("name", ""),
+                "descriptor": descriptor
+            })
+
+        if dirty_pickle:
+            save_pickle_index(pickle_index)
+
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load face descriptors: {str(e)}")
+
+@app.post("/api/face-descriptors/cache")
+def cache_face_descriptor(req: DescriptorCacheRequest, current_user: dict = Depends(get_current_user)):
+    if not req.worker_id or not req.descriptor:
+        raise HTTPException(status_code=400, detail="Worker ID and descriptor are required")
+    try:
+        pickle_index = load_pickle_index()
+        pickle_index[req.worker_id] = req.descriptor
+        save_pickle_index(pickle_index)
+
+        db = get_db()
+        db.workers.update_one({"_id": ObjectId(req.worker_id)}, {"$set": {"face_descriptor": req.descriptor}})
+        return {"success": True, "message": "Face descriptor saved to index.pickle"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to cache face descriptor: {str(e)}")
+
+@app.post("/api/face-descriptors/reset")
+def reset_face_descriptors(current_user: dict = Depends(get_current_user)):
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Only administrators can refresh the face index")
+    try:
+        # Reset index.pickle
+        save_pickle_index({})
+        
+        # Unset face_descriptor on all worker documents in database
+        db = get_db()
+        db.workers.update_many({}, {"$unset": {"face_descriptor": ""}})
+        
+        return {"success": True, "message": "Face descriptors and index.pickle reset successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to reset face descriptors: {str(e)}")
+
+
 
 def check_24h_window(att_record: Optional[dict], target_date_str: str) -> tuple:
     """
@@ -480,6 +736,8 @@ def get_attendance(
             att["is_locked"] = is_older_than_24h and (current_user.get("role") == "site_manager")
             if not att.get("check_in"):
                 att["status"] = "Absent"
+            elif att.get("status") in [None, "", "Absent", "Pending"]:
+                att["status"] = "Present"
         else:
             is_older_than_24h, rec_at_iso = check_24h_window(None, target_date)
             att = {
@@ -509,6 +767,20 @@ def get_attendance(
         "records": result
     }
 
+def get_16th_cycle_start_date(ref_date: Optional[date] = None) -> str:
+    if ref_date is None:
+        ref_date = date.today()
+    if ref_date.day >= 16:
+        start_d = ref_date.replace(day=16)
+    else:
+        month = ref_date.month - 1
+        year = ref_date.year
+        if month < 1:
+            month = 12
+            year -= 1
+        start_d = date(year, month, 16)
+    return start_d.isoformat()
+
 @app.get("/api/attendance/worker/{worker_id}")
 def get_worker_attendance_history(
     worker_id: str,
@@ -530,24 +802,77 @@ def get_worker_attendance_history(
     worker_doc = serialize_doc(worker)
 
     today_str = date.today().isoformat()
-    att_filter: dict = {"worker_id": worker_id}
 
-    if start_date or end_date:
-        date_filter: dict = {}
-        if start_date:
-            date_filter["$gte"] = start_date
-        if end_date:
-            eff_end = min(end_date, today_str)
-            date_filter["$lte"] = eff_end
-        att_filter["date"] = date_filter
+    if end_date and isinstance(end_date, str):
+        eff_end = min(end_date, today_str)
+    else:
+        eff_end = today_str
 
-    records_raw = list(db.attendance.find(att_filter).sort("date", -1))
-    records = []
+    records_raw = list(db.attendance.find({"worker_id": worker_id}))
+
+    if start_date and isinstance(start_date, str):
+        eff_start = start_date
+    else:
+        default_start = get_16th_cycle_start_date()
+        dates_found = []
+        for r in records_raw:
+            if r.get("date"):
+                dates_found.append(r["date"])
+        if worker.get("created_at"):
+            try:
+                c_date = str(worker["created_at"])[:10]
+                if len(c_date) == 10 and c_date.count("-") == 2:
+                    dates_found.append(c_date)
+            except:
+                pass
+        if dates_found:
+            min_found = min(dates_found)
+            eff_start = min(min_found, default_start)
+        else:
+            eff_start = default_start
+
+    if eff_start > eff_end:
+        eff_start = eff_end
+
+    record_map = {}
     for r in records_raw:
         doc = serialize_doc(r)
-        if doc.get("check_in") and doc.get("check_out"):
-            doc["hours_worked"] = calculate_hours(doc["check_in"], doc["check_out"])
-        records.append(doc)
+        d = doc.get("date")
+        if d and eff_start <= d <= eff_end:
+            record_map[d] = doc
+
+    try:
+        start_dt = datetime.strptime(eff_start, "%Y-%m-%d").date()
+        end_dt = datetime.strptime(eff_end, "%Y-%m-%d").date()
+    except Exception:
+        start_dt = datetime.strptime(get_16th_cycle_start_date(), "%Y-%m-%d").date()
+        end_dt = date.today()
+
+    records = []
+    curr_dt = start_dt
+    while curr_dt <= end_dt:
+        d_str = curr_dt.isoformat()
+        if d_str in record_map:
+            doc = record_map[d_str]
+            if doc.get("check_in") and doc.get("check_out"):
+                doc["hours_worked"] = calculate_hours(doc["check_in"], doc["check_out"])
+            elif not doc.get("check_in"):
+                doc["status"] = doc.get("status") or "Absent"
+                doc["hours_worked"] = float(doc.get("hours_worked") or 0.0)
+            records.append(doc)
+        else:
+            records.append({
+                "worker_id": worker_id,
+                "date": d_str,
+                "check_in": None,
+                "check_out": None,
+                "status": "Absent",
+                "hours_worked": 0.0,
+                "notes": "",
+                "work_volume": "",
+                "recorded_at": None
+            })
+        curr_dt += timedelta(days=1)
 
     total_hours = round(sum(float(r.get("hours_worked") or 0) for r in records), 2)
     days_worked = sum(
@@ -573,7 +898,7 @@ def get_payroll_report(
     
     today_str = date.today().isoformat()
     if not start_date or start_date > today_str:
-        start_date = date.today().replace(day=1).isoformat()
+        start_date = get_16th_cycle_start_date()
         if start_date > today_str:
             start_date = today_str
     if not end_date or end_date > today_str:
@@ -637,7 +962,7 @@ def get_payroll_report(
             hrs = float(att.get("hours_worked") or 0.0)
             st = att.get("status", "")
             worker_hours += hrs
-            if hrs > 0 or st in ["Present", "Late"]:
+            if hrs > 0 or st in ["Present", "Late", "Half-Day"] or att.get("check_in"):
                 days_worked += 1
             vol = str(att.get("work_volume") or "").strip()
             if vol:
@@ -708,6 +1033,26 @@ def record_attendance(req: AttendanceRecordRequest, current_user: dict = Depends
 
     check_in_clean = (req.check_in or "").strip() if req.check_in else None
     check_out_clean = (req.check_out or "").strip() if req.check_out else None
+
+    if check_in_clean and check_out_clean:
+        if check_in_clean == check_out_clean:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid attendance times: Check-In time ({check_in_clean}) and Check-Out time ({check_out_clean}) cannot be identical."
+            )
+
+    if check_in_clean:
+        try:
+            worker_obj = db.workers.find_one({"_id": ObjectId(req.worker_id)})
+            if worker_obj and worker_obj.get("status") in ["On Leave", "Resigned", "Terminated"]:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Worker '{worker_obj.get('name', 'Worker')}' is currently {worker_obj.get('status')} and cannot be checked in."
+                )
+        except HTTPException:
+            raise
+        except Exception:
+            pass
 
     filter_doc = {"worker_id": req.worker_id, "date": req.date}
     existing = db.attendance.find_one(filter_doc)
@@ -815,10 +1160,31 @@ def bulk_checkin(req: BulkCheckInRequest, current_user: dict = Depends(get_curre
                     detail="24_HOUR_OVERRIDE_REQUIRED: One or more attendance records were recorded over 24 hours ago. Admin confirmation is required."
                 )
 
+    # Filter active workers (exclude On Leave / Resigned / Terminated workers)
+    active_worker_ids = set()
+    try:
+        w_oids = []
+        for wid in req.worker_ids:
+            try: w_oids.append(ObjectId(wid))
+            except: pass
+        active_docs = list(db.workers.find({
+            "_id": {"$in": w_oids},
+            "$or": [
+                {"status": "Active"},
+                {"status": {"$exists": False}}
+            ]
+        }))
+        active_worker_ids = {str(w["_id"]) for w in active_docs}
+    except Exception:
+        pass
+
     now_iso = datetime.now(timezone.utc).isoformat()
     updated_count = 0
     
     for wid in req.worker_ids:
+        if active_worker_ids and wid not in active_worker_ids:
+            continue
+
         filter_doc = {"worker_id": wid, "date": req.date}
         existing = db.attendance.find_one(filter_doc)
         
@@ -828,6 +1194,8 @@ def bulk_checkin(req: BulkCheckInRequest, current_user: dict = Depends(get_curre
             if rec_str: recorded_at = rec_str
 
         check_out = existing.get("check_out") if existing else None
+        if check_out and str(check_out).strip() == str(req.check_in_time).strip():
+            check_out = None
         hours = calculate_hours(req.check_in_time, check_out)
         
         db.attendance.update_one(
@@ -883,21 +1251,49 @@ def bulk_checkout(req: BulkCheckOutRequest, current_user: dict = Depends(get_cur
                     detail="24_HOUR_OVERRIDE_REQUIRED: One or more attendance records were recorded over 24 hours ago. Admin confirmation is required."
                 )
 
+    # Filter active workers (exclude On Leave / Resigned / Terminated workers)
+    active_worker_ids = set()
+    try:
+        w_oids = []
+        for wid in req.worker_ids:
+            try: w_oids.append(ObjectId(wid))
+            except: pass
+        active_docs = list(db.workers.find({
+            "_id": {"$in": w_oids},
+            "$or": [
+                {"status": "Active"},
+                {"status": {"$exists": False}}
+            ]
+        }))
+        active_worker_ids = {str(w["_id"]) for w in active_docs}
+    except Exception:
+        pass
+
     now_iso = datetime.now(timezone.utc).isoformat()
     updated_count = 0
     
     for wid in req.worker_ids:
+        if active_worker_ids and wid not in active_worker_ids:
+            continue
+
         filter_doc = {"worker_id": wid, "date": req.date}
         existing = db.attendance.find_one(filter_doc)
         
+        # Batch Check-Out applies ONLY to workers who have checked in! Skip workers with no check-in.
+        check_in = existing.get("check_in") if existing else None
+        if not check_in or not str(check_in).strip():
+            continue
+
+        # Skip workers where check_in is identical to batch check_out_time
+        if str(check_in).strip() == str(req.check_out_time).strip():
+            continue
+
         recorded_at = now_iso
         if existing:
             rec_str = existing.get("recorded_at") or existing.get("created_at") or existing.get("updated_at")
             if rec_str: recorded_at = rec_str
 
-        check_in = existing.get("check_in") if existing else None
         hours = calculate_hours(check_in, req.check_out_time)
-        status_val = "Present" if check_in else "Absent"
         
         db.attendance.update_one(
             filter_doc,
@@ -906,7 +1302,7 @@ def bulk_checkout(req: BulkCheckOutRequest, current_user: dict = Depends(get_cur
                 "date": req.date,
                 "check_in": check_in,
                 "check_out": req.check_out_time,
-                "status": status_val,
+                "status": "Present",
                 "hours_worked": hours,
                 "recorded_at": recorded_at,
                 "updated_by": current_user["username"],
@@ -1053,7 +1449,27 @@ def delete_user(username: str, current_user: dict = Depends(require_admin)):
         raise HTTPException(status_code=404, detail="User not found")
     return {"message": f"User {username} removed successfully"}
 
-# --- Static Files Mount ---
+# --- Static Files & AI Models Mount ---
+class CachedStaticFiles(StaticFiles):
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Content-Disposition"] = "inline"
+        if path.endswith(".bin"):
+            response.headers["Content-Type"] = "application/octet-stream"
+        elif path.endswith(".json"):
+            response.headers["Content-Type"] = "application/json"
+        elif path.endswith(".js"):
+            response.headers["Content-Type"] = "application/javascript"
+        return response
+
+models_dir_path = os.path.join(os.path.dirname(__file__), "static", "models")
+if not os.path.exists(models_dir_path):
+    os.makedirs(models_dir_path, exist_ok=True)
+
+app.mount("/models", CachedStaticFiles(directory=models_dir_path), name="models")
+
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 if not os.path.exists(static_dir):
     os.makedirs(static_dir, exist_ok=True)

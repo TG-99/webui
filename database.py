@@ -1,6 +1,6 @@
 import os
 import certifi
-from pymongo import MongoClient, ASCENDING, DESCENDING
+from pymongo import MongoClient, ASCENDING
 from datetime import datetime, timezone
 import hashlib
 

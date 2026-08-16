@@ -24,6 +24,10 @@
         <h1>Mohammad Construction</h1>
         <p>& Engineering Sdn.Bhd.</p>
       </div>
+      <div id="authLoadingState" style="display:none; text-align:center; padding: 1.5rem 0;">
+        <i class="fa-solid fa-spinner fa-spin fa-2x" style="color: var(--accent);"></i>
+        <p style="margin-top: 0.75rem; color: var(--text-muted); font-size: 0.9rem;">Verifying session...</p>
+      </div>
       <form id="loginForm" onsubmit="handleLogin(event)">
         <div class="form-group">
           <label class="form-label" for="loginUsername">Username</label>
@@ -39,9 +43,6 @@
           <i class="fa-solid fa-right-to-bracket"></i> Sign In to Portal
         </button>
       </form>
-      <div style="margin-top: 1.5rem; text-align: center; font-size: 0.75rem; color: var(--text-muted);">
-        <p>Default Admin Login: <strong>admin</strong> / <strong>admin123</strong></p>
-      </div>
     </div>
   </div>
 
@@ -68,6 +69,10 @@
         <a class="nav-item active" onclick="switchSection('dashboard', this)">
           <i class="fa-solid fa-chart-pie"></i>
           <span>Dashboard</span>
+        </a>
+        <a class="nav-item" onclick="switchSection('face-scanner', this)">
+          <i class="fa-solid fa-camera-rotate"></i>
+          <span>Face Recognition</span>
         </a>
         <a class="nav-item" onclick="switchSection('attendance', this)">
           <i class="fa-solid fa-calendar-check"></i>
@@ -122,7 +127,8 @@
       <!-- Top Header Bar -->
       <header class="top-header">
         <div class="header-left">
-          <button class="toggle-sidebar-btn" id="sidebarToggleBtn" onclick="toggleSidebar()" aria-label="Toggle Navigation Menu">
+          <button class="toggle-sidebar-btn" id="sidebarToggleBtn" onclick="toggleSidebar()"
+            aria-label="Toggle Navigation Menu">
             <div class="hamburger-icon">
               <span class="bar bar-top"></span>
               <span class="bar bar-middle"></span>
@@ -215,8 +221,7 @@
                     <div class="wp-search-wrap">
                       <i class="fa-solid fa-magnifying-glass wp-search-icon"></i>
                       <input type="text" id="wpSearchInput" class="wp-search-input"
-                        placeholder="Search by name or passport…"
-                        oninput="filterWorkerPicker(this.value)"
+                        placeholder="Search by name or passport…" oninput="filterWorkerPicker(this.value)"
                         onclick="event.stopPropagation()">
                     </div>
                     <div class="wp-list" id="wpList"></div>
@@ -246,8 +251,23 @@
 
             <!-- Results area -->
             <div id="workerLookupResult" style="display:none;">
-              <!-- Worker info bar -->
-              <div id="lookupWorkerInfoBar" class="lookup-info-bar"></div>
+              <!-- Worker info bar & export buttons -->
+              <div
+                style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1rem;">
+                <div id="lookupWorkerInfoBar" class="lookup-info-bar" style="flex:1; margin-bottom:0;"></div>
+                <div style="display:flex; flex-direction:column; gap:0.4rem;">
+                  <button type="button" class="btn btn-sm btn-outline" onclick="exportWorkerAttendanceCSV()"
+                    title="Export CSV file"
+                    style="display:inline-flex; align-items:center; justify-content:center; gap:0.4rem; padding:0.4rem 0.8rem; font-weight:600;">
+                    <i class="fa-solid fa-file-csv" style="color:#10B981; font-size:1.1rem;"></i> Export CSV
+                  </button>
+                  <button type="button" class="btn btn-sm btn-outline" onclick="exportWorkerAttendancePDF()"
+                    title="Print or Save PDF report"
+                    style="display:inline-flex; align-items:center; justify-content:center; gap:0.4rem; padding:0.4rem 0.8rem; font-weight:600;">
+                    <i class="fa-solid fa-print" style="color:#EF4444; font-size:1.1rem;"></i> Print / PDF
+                  </button>
+                </div>
+              </div>
               <!-- Summary chips -->
               <div id="lookupSummaryBar" class="lookup-summary-bar"></div>
               <!-- Table -->
@@ -256,7 +276,11 @@
                   <thead>
                     <tr>
                       <th>#</th>
-                      <th>Date</th>
+                      <th style="cursor:pointer; user-select:none; white-space:nowrap;" id="lookupDateSortBtn"
+                        onclick="toggleLookupDateSort()" title="Click to sort Date Ascending / Descending">
+                        Date <i class="fa-solid fa-arrow-up-1-9" id="lookupDateSortIcon"
+                          style="margin-left:4px; font-size:0.85rem; color:#10B981;"></i>
+                      </th>
                       <th>Day</th>
                       <th>Status</th>
                       <th>Check-In</th>
@@ -329,32 +353,45 @@
                 </button>
               </div>
             </div>
-            <div class="filter-item">
-              <label class="form-label"><i class="fa-solid fa-city"></i> Project Site</label>
-              <select id="attendanceProjectFilter" class="form-select" onchange="loadAttendanceSheet()">
-                <option value="">All Active Projects</option>
-              </select>
-            </div>
-            <div class="filter-item">
-              <label class="form-label"><i class="fa-solid fa-layer-group"></i> Worker Group</label>
-              <select id="attendanceGroupFilter" class="form-select" onchange="loadAttendanceSheet()">
-                <option value="">All Worker Groups</option>
-              </select>
+            <div class="filter-row-mobile">
+              <div class="filter-item">
+                <label class="form-label"><i class="fa-solid fa-city"></i> Project Site</label>
+                <select id="attendanceProjectFilter" class="form-select" onchange="loadAttendanceSheet()">
+                  <option value="">All Active Projects</option>
+                </select>
+              </div>
+              <div class="filter-item">
+                <label class="form-label"><i class="fa-solid fa-layer-group"></i> Worker Group</label>
+                <select id="attendanceGroupFilter" class="form-select" onchange="loadAttendanceSheet()">
+                  <option value="">All Worker Groups</option>
+                </select>
+              </div>
             </div>
             <div class="filter-actions">
-              <button class="btn btn-success filter-btn-full" onclick="triggerBatchCheckIn()">
-                <i class="fa-solid fa-check-double"></i> Batch Check-In (08:00 AM)
-              </button>
-              <button class="btn btn-warning filter-btn-full" onclick="triggerBatchCheckOut()">
-                <i class="fa-solid fa-right-from-bracket"></i> Batch Check-Out (06:00 PM)
-              </button>
+              <div class="batch-actions-wrapper">
+                <div class="batch-action-group">
+                  <input type="time" id="batchCheckInTime" class="form-control batch-time-picker" value="08:00" title="Batch Check-In Time (Default 08:00 AM)">
+                  <button type="button" class="btn btn-success filter-btn-full" onclick="triggerBatchCheckIn()" title="Batch Check-In selected time for all workers">
+                    <i class="fa-solid fa-check-double"></i> Batch Check-In
+                  </button>
+                </div>
+                <div class="batch-action-group">
+                  <input type="time" id="batchCheckOutTime" class="form-control batch-time-picker" value="18:00" title="Batch Check-Out Time (Default 06:00 PM)">
+                  <button type="button" class="btn btn-warning filter-btn-full" onclick="triggerBatchCheckOut()" title="Batch Check-Out selected time for all workers">
+                    <i class="fa-solid fa-right-from-bracket"></i> Batch Check-Out
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
           <div class="card">
             <div class="card-header">
               <div class="card-title">
-                <i class="fa-solid fa-clipboard-user"></i> Daily Worker Details Table
+                <i class="fa-solid fa-clipboard-user"></i> Daily Worker Details Table <span
+                  style="font-size: 0.95rem; font-weight: 700; color: var(--accent-gold);"
+                  title="Filtered Workers / Total Workers">(<span id="attFilteredCount">0</span>/<span
+                    id="attTotalCount">0</span>)</span>
               </div>
               <button type="button" class="btn btn-secondary btn-sm mobile-only-inline" id="btnToggleExpandAll"
                 onclick="toggleAllWorkerCards()">
@@ -365,13 +402,12 @@
               <table class="table" id="attendanceTable">
                 <thead>
                   <tr>
-                    <th>Worker Details</th>
-                    <th>Group / Project</th>
-                    <th style="min-width: 175px;">Check-In Time</th>
-                    <th style="min-width: 175px;">Check-Out Time</th>
-                    <th>Total Hours</th>
-                    <th style="min-width: 170px;">Daily Work Volume</th>
-                    <th>Confirm</th>
+                    <th class="col-th-worker">Worker Details</th>
+                    <th class="col-th-checkin">Check-In Time</th>
+                    <th class="col-th-checkout">Check-Out Time</th>
+                    <th class="col-th-hours">Total Hours</th>
+                    <th class="col-th-volume">Daily Work Volume</th>
+                    <th class="col-th-status">Status Info</th>
                   </tr>
                 </thead>
                 <tbody id="attendanceTableBody">
@@ -384,40 +420,88 @@
 
         <!-- SECTION 3: Workers List -->
         <section id="section-workers" class="app-section animate-fade-in" style="display: none;">
+          <!-- Compact Worker Stats Toolbar -->
+          <div class="worker-stats-compact-bar">
+            <div class="stat-pill-item">
+              <div class="stat-pill-icon total-bg"><i class="fa-solid fa-users"></i></div>
+              <div class="stat-pill-meta">
+                <span class="stat-pill-title">Total</span>
+                <strong class="stat-pill-num" id="totalWorkerCount">0</strong>
+              </div>
+            </div>
+
+            <div class="stat-pill-divider"></div>
+
+            <div class="stat-pill-item">
+              <div class="stat-pill-icon filter-bg"><i class="fa-solid fa-user-check"></i></div>
+              <div class="stat-pill-meta">
+                <span class="stat-pill-title">Filtered</span>
+                <strong class="stat-pill-num accent-gold" id="filteredWorkerCount">0</strong>
+              </div>
+            </div>
+
+            <div class="stat-pill-divider"></div>
+
+            <div class="stat-pill-item photo-pill-container">
+              <span class="stat-pill-title photo-title"><i class="fa-solid fa-camera"></i> Photos:</span>
+              <div class="photo-btn-group">
+                <button type="button" class="photo-count-btn" id="btnWithPhoto"
+                  onclick="togglePhotoFilter('with_photo')" title="Click to filter workers WITH profile photo">
+                  <i class="fa-solid fa-image" style="color:#10B981;"></i>
+                  <span class="count-num" id="withPhotoCount">0</span>
+                  <span class="count-label">With Pic</span>
+                </button>
+                <button type="button" class="photo-count-btn" id="btnWithoutPhoto"
+                  onclick="togglePhotoFilter('without_photo')" title="Click to filter workers WITHOUT profile photo">
+                  <i class="fa-solid fa-image-portrait" style="color:#EF4444;"></i>
+                  <span class="count-num" id="withoutPhotoCount">0</span>
+                  <span class="count-label">No Pic</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div class="filter-bar">
             <div class="filter-item" style="flex: 2;">
               <label class="form-label"><i class="fa-solid fa-magnifying-glass"></i> Search Worker</label>
               <input type="text" id="workerSearchQuery" class="form-control"
                 placeholder="Search by name or passport number..." onkeyup="loadWorkers()">
             </div>
-            <div class="filter-item">
-              <label class="form-label">Project</label>
-              <select id="workerProjectFilter" class="form-select" onchange="loadWorkers()">
-                <option value="">All Projects</option>
-              </select>
+            <div class="filter-row-mobile">
+              <div class="filter-item">
+                <label class="form-label">Project</label>
+                <select id="workerProjectFilter" class="form-select" onchange="loadWorkers()">
+                  <option value="">All Projects</option>
+                </select>
+              </div>
+              <div class="filter-item">
+                <label class="form-label">Group</label>
+                <select id="workerGroupFilter" class="form-select" onchange="loadWorkers()">
+                  <option value="">All Groups</option>
+                </select>
+              </div>
             </div>
-            <div class="filter-item">
-              <label class="form-label">Group</label>
-              <select id="workerGroupFilter" class="form-select" onchange="loadWorkers()">
-                <option value="">All Groups</option>
-              </select>
-            </div>
-            <div class="filter-item">
-              <label class="form-label">Status</label>
-              <select id="workerStatusFilter" class="form-select" onchange="loadWorkers()">
-                <option value="">All Statuses</option>
-                <option value="Active">Active</option>
-                <option value="On Leave">On Leave</option>
-                <option value="Resigned">Resigned</option>
-                <option value="Terminated">Terminated</option>
-              </select>
-            </div>
-            <div style="display:flex; align-items:flex-end;">
-              <button class="btn btn-accent" onclick="openWorkerModal()">
-                <i class="fa-solid fa-user-plus"></i> Add Worker
-              </button>
+            <div class="filter-row-mobile">
+              <div class="filter-item">
+                <label class="form-label">Status</label>
+                <select id="workerStatusFilter" class="form-select" onchange="loadWorkers()">
+                  <option value="">All Statuses</option>
+                  <option value="Active">Active</option>
+                  <option value="On Leave">On Leave</option>
+                  <option value="Resigned">Resigned</option>
+                  <option value="Terminated">Terminated</option>
+                </select>
+              </div>
+              <div class="filter-item">
+                <label class="form-label">&nbsp;</label>
+                <button class="btn btn-accent filter-btn-full" onclick="openWorkerModal()">
+                  <i class="fa-solid fa-user-plus"></i> Add Worker
+                </button>
+              </div>
             </div>
           </div>
+
+
 
           <div class="grid-cards" id="workersGrid">
             <!-- Dynamic Worker Cards -->
@@ -607,45 +691,353 @@
           </div>
         </section>
 
+        <!-- SECTION 8: FACE RECOGNITION ATTENDANCE SCANNER -->
+        <section id="section-face-scanner" class="app-section animate-fade-in" style="display: none;">
+          <!-- AI Engine Status Badge -->
+          <div class="face-scanner-status-row">
+            <div id="aiEngineStatusBadge" class="scanner-status-badge badge-ready">
+              <i class="fa-solid fa-circle-dot"></i> Face Engine Ready
+            </div>
+          </div>
+
+          <!-- Mobile-Style Modern Face Scan Card -->
+          <div class="face-scan-card-container">
+            <div class="face-scan-card">
+              <!-- Top Navigation / Header Actions -->
+              <div class="face-scan-card-header">
+                <!-- Left Options Menu Dropdown -->
+                <div class="face-scan-menu-wrapper">
+                  <div class="face-scan-menu-btn" onclick="toggleFaceScanOptionsMenu(event)"
+                    title="Face Scanner Options Menu">
+                    <i class="fa-solid fa-bars-staggered"></i>
+                  </div>
+                  <!-- Floating Options Dropdown -->
+                  <div class="face-scan-options-dropdown" id="faceScanOptionsMenu">
+                    <div class="dropdown-item admin-only" onclick="triggerPhotoUploadScan()">
+                      <i class="fa-solid fa-file-image"></i> <span>Scan Photo File</span>
+                    </div>
+                    <div class="dropdown-item admin-only" onclick="refreshFaceDescriptorsIndex()">
+                      <i class="fa-solid fa-arrows-rotate"></i> <span>Refresh Face Index Cache</span>
+                    </div>
+                    <div class="dropdown-divider admin-only"></div>
+                    <div class="dropdown-item" onclick="toggleFaceScannerCamera()">
+                      <i class="fa-solid fa-video"></i> <span>Start / Stop Camera Scanner</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Right Action Controls -->
+                <div class="viewfinder-header-actions">
+                  <div class="camera-select-pill" id="btnCycleCamera" onclick="cycleNextCamera()"
+                    title="Click to switch camera device">
+                    <i class="fa-solid fa-camera-rotate camera-pill-icon"></i>
+                    <span id="lblActiveCameraName" class="camera-pill-label">Default Camera</span>
+                  </div>
+
+                  <select id="cameraSelect" class="camera-select-input" onchange="changeScannerCamera(this.value)"
+                    style="display: none;">
+                    <option value="">Default Camera</option>
+                  </select>
+
+                  <button type="button" class="action-icon-pill admin-only" onclick="triggerPhotoUploadScan()"
+                    title="Scan Photo File (Admin Only)">
+                    <i class="fa-solid fa-file-image"></i>
+                  </button>
+
+                  <button type="button" class="action-icon-pill admin-only" onclick="refreshFaceDescriptorsIndex()"
+                    title="Refresh Face Index & Cache (Admin Only)">
+                    <i class="fa-solid fa-arrows-rotate"></i>
+                  </button>
+
+                  <input type="file" id="scanFileInput" accept="image/*" style="display:none;"
+                    onchange="handleImageFileScan(event)">
+                </div>
+              </div>
+
+              <!-- Main Circular Face Scanner Body -->
+              <div class="face-scan-body">
+                <div class="face-circle-container" id="viewfinderWrapper">
+                  <!-- Outer Animated Cyan Scanning Arc Ring -->
+                  <div class="face-scan-arc-ring" id="faceScanArcRing"></div>
+
+                  <!-- Floating Top-Left Interactive Camera Toggle Badge -->
+                  <div class="face-scan-floating-badge" onclick="toggleFaceScannerCamera()"
+                    title="Quick start / stop camera scanner">
+                    <i class="fa-solid fa-expand" id="floatingBadgeIcon"></i>
+                  </div>
+
+                  <!-- Perfect Circular Camera Viewport -->
+                  <div class="face-circle-wrapper">
+                    <div class="camera-dummy-placeholder" id="cameraDummyPlaceholder">
+                      <i class="fa-solid fa-user"></i>
+                    </div>
+                    <video id="faceWebcam" autoplay muted playsinline></video>
+                    <canvas id="faceOverlayCanvas"></canvas>
+                  </div>
+                </div>
+
+                <!-- Pagination / Indicator Dots -->
+                <div class="face-scan-indicators">
+                  <span class="indicator-pill active"></span>
+                  <span class="indicator-dot"></span>
+                  <span class="indicator-dot"></span>
+                </div>
+
+                <!-- Text Header & Guidance Subtitle -->
+                <h2 class="face-scan-title">Scanning your face</h2>
+                <p class="face-scan-subtitle">Keep your head up and make sure your face fits into the circle.</p>
+
+                <!-- Action Button Toolbar -->
+                <div class="face-scan-actions">
+                  <button type="button" class="btn btn-accent btn-lg start-camera-btn" id="btnStartCamera"
+                    onclick="toggleFaceScannerCamera()">
+                    <i class="fa-solid fa-video" id="btnCameraIcon"></i>
+                    <span id="lblStartCamera">Start Camera Scanner</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
       </main>
     </div>
   </div>
 
-  <!-- MODALS -->
-
-  <!-- Admin 24-Hour Edit Confirmation Modal -->
-  <div class="modal-backdrop" id="adminConfirmModal">
-    <div class="modal-box" style="max-width: 460px;">
-      <div class="modal-header"
-        style="background: linear-gradient(135deg, #FEF3C7, #FDE68A); border-bottom: 1px solid #F59E0B;">
-        <h3 class="modal-title" style="color: #78350F; display:flex; align-items:center; gap:0.5rem;">
-          <i class="fa-solid fa-triangle-exclamation" style="color: #D97706;"></i> Admin Edit Confirmation (>24h)
+  <!-- Matched Worker Floating Window Modal (Compact View) -->
+  <div class="modal-backdrop" id="matchedWorkerFloatingOverlay">
+    <div class="modal-box matched-floating-box compact-matched-card" style="max-width: 430px;">
+      <!-- Header Bar -->
+      <div class="modal-header matched-floating-header" style="padding: 0.75rem 1rem;">
+        <h3 class="modal-title"
+          style="color: var(--primary); font-size: 0.95rem; display: flex; align-items: center; gap: 0.4rem;">
+          <i class="fa-solid fa-user-check" style="color: #10B981;"></i> Matched Worker
         </h3>
-        <button class="modal-close" onclick="closeModal('adminConfirmModal')">&times;</button>
+        <button class="modal-close" onclick="resetMatchedWorkerUI()" title="Close">&times;</button>
       </div>
-      <div class="modal-body" style="padding: 1.25rem;">
-        <div style="text-align: center; margin-bottom: 1rem;">
+
+      <div class="modal-body" style="padding: 0.85rem 1rem;">
+        <!-- Matched Worker Content Card -->
+        <div id="matchedWorkerContent" style="display: none;">
+          <!-- Compact Profile Header Card -->
+          <div class="compact-profile-card">
+            <div class="compact-avatar-wrapper">
+              <img id="matchedWorkerImg" src="" onerror="handleImgError(this)" class="matched-profile-img" alt="Worker">
+              <div class="compact-score-badge" id="lblMatchScore">98%</div>
+            </div>
+            <div class="compact-profile-details">
+              <h3 class="matched-name" id="matchedWorkerName">Worker Name</h3>
+              <div class="matched-meta-tags">
+                <span class="matched-tag" title="Passport Number"><i class="fa-solid fa-id-card"></i> <span
+                    id="matchedWorkerPassport">-</span></span>
+                <span class="matched-tag" title="Project"><i class="fa-solid fa-city"></i> <span
+                    id="matchedWorkerProject">-</span></span>
+                <span class="matched-tag" title="Group"><i class="fa-solid fa-layer-group"></i> <span
+                    id="matchedWorkerGroup">-</span></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Compact Attendance Record Form -->
+          <div class="matched-attendance-form" id="matchedAttendanceForm">
+            <!-- Compact Live Time Row -->
+            <div class="compact-time-row">
+              <div class="compact-time-mode">
+                <i class="fa-solid fa-clock time-icon"></i>
+                <span id="lblScanTimeMode">Check-In Detection</span>
+              </div>
+              <div class="compact-time-input-wrapper">
+                <input type="time" id="scanRecordTime" class="compact-time-input">
+              </div>
+            </div>
+
+            <!-- Notes Input -->
+            <div class="form-group" id="scanWorkVolumeNotesGroup" style="margin-bottom: 0.75rem;">
+              <input type="text" id="scanRecordNotes" class="form-control compact-notes-input"
+                placeholder="Work volume / notes (Optional)">
+            </div>
+
+            <!-- Action Buttons Grid -->
+            <div class="compact-actions-grid">
+              <button type="button" id="btnConfirmCheckIn" class="btn btn-success compact-btn" style="display: none;"
+                onclick="submitMatchedAttendance('CheckIn')">
+                <i class="fa-solid fa-right-to-bracket"></i> Check-In
+              </button>
+              <button type="button" id="btnConfirmCheckOut" class="btn btn-accent compact-btn" style="display: none;"
+                onclick="submitMatchedAttendance('CheckOut')">
+                <i class="fa-solid fa-right-from-bracket"></i> Check-Out
+              </button>
+              <button type="button" class="btn btn-secondary compact-btn" onclick="resetMatchedWorkerUI()">
+                <i class="fa-solid fa-rotate-right"></i> Next Scan
+              </button>
+            </div>
+          </div>
+
+          <!-- Custom Overwrite Confirmation Pane -->
+          <div id="matchedWorkerOverwriteConfirmPane" style="display: none; padding: 0.75rem 0; text-align: center;">
+            <div class="compact-warning-icon">
+              <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h4 style="font-size: 0.95rem; font-weight: 800; color: #92400E; margin: 0.35rem 0 0.2rem 0;">Record Exists
+            </h4>
+            <p id="lblOverwriteConfirmText" style="font-size: 0.78rem; color: #78350F; margin: 0 0 0.75rem 0;">An
+              attendance record already exists for today.</p>
+            <div style="display: flex; gap: 0.5rem; justify-content: center;">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="cancelOverwriteConfirm()">Cancel</button>
+              <button type="button" class="btn btn-warning btn-sm" onclick="proceedWithOverwrite()">Overwrite</button>
+            </div>
+          </div>
+
+          <!-- Custom Inline Success Pane -->
+          <div id="matchedWorkerSuccessPane" style="display: none; padding: 0.85rem 0; text-align: center;">
+            <div class="compact-success-icon">
+              <i class="fa-solid fa-circle-check"></i>
+            </div>
+            <h4 style="font-size: 1.05rem; font-weight: 800; color: #065F46; margin: 0.4rem 0 0.2rem 0;"
+              id="lblSuccessWorkerName">Worker Recorded</h4>
+            <p id="lblSuccessActionDetails" style="font-size: 0.85rem; font-weight: 600; color: #047857; margin: 0;">
+              Attendance recorded successfully</p>
+          </div>
+
+          <!-- Custom Inline Error Pane -->
+          <div id="matchedWorkerErrorPane" style="display: none; padding: 0.85rem 0; text-align: center;">
+            <div class="compact-error-icon">
+              <i class="fa-solid fa-circle-xmark"></i>
+            </div>
+            <h4 style="font-size: 1.05rem; font-weight: 800; color: #991B1B; margin: 0.4rem 0 0.2rem 0;"
+              id="lblErrorTitle">Invalid Attendance Times</h4>
+            <p id="lblErrorDetails"
+              style="font-size: 0.82rem; font-weight: 600; color: #B91C1C; margin: 0 0 0.75rem 0;">Check-In time and Check-Out time cannot be identical.</p>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="dismissMatchedWorkerError()"
+              style="font-weight: 700;">
+              <i class="fa-solid fa-arrow-left"></i> Go Back & Adjust Time
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <!-- Admin 24-Hour Edit Confirmation Modal (Compact Design) -->
+  <div class="modal-backdrop" id="adminConfirmModal">
+    <div class="modal-box" style="max-width: 400px; border-radius: var(--radius-lg); overflow: hidden;">
+      <div class="modal-header"
+        style="background: linear-gradient(135deg, #FEF3C7, #FDE68A); padding: 0.65rem 1rem; border-bottom: 1px solid #F59E0B;">
+        <h3 class="modal-title"
+          style="color: #78350F; font-size: 0.92rem; font-weight: 700; display:flex; align-items:center; gap:0.4rem;">
+          <i class="fa-solid fa-shield-halved" style="color: #D97706; font-size: 0.95rem;"></i> Admin Edit Override
+          (>24h)
+        </h3>
+        <button class="modal-close" onclick="closeModal('adminConfirmModal')"
+          style="font-size: 1.1rem; line-height: 1;">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 0.85rem 1rem;">
+        <div
+          style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.65rem; background: var(--bg-hover, #F8FAFC); padding: 0.6rem 0.75rem; border-radius: var(--radius-md); border: 1px solid var(--border-color, #E2E8F0);">
           <div
-            style="width: 56px; height: 56px; border-radius: 50%; background: #FEF3C7; color: #D97706; display: flex; align-items: center; justify-content: center; font-size: 1.75rem; margin: 0 auto 0.75rem;">
+            style="width: 38px; height: 38px; border-radius: 50%; background: #FEF3C7; color: #D97706; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">
             <i class="fa-solid fa-clock-rotate-left"></i>
           </div>
-          <h4 id="adminConfirmWorkerName" style="font-size: 1.1rem; color: var(--primary); font-weight: 700;">Worker
-            Name</h4>
-          <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;" id="adminConfirmRecordDate">
-            Recorded: Date / Time</p>
+          <div style="line-height: 1.25; overflow: hidden;">
+            <strong id="adminConfirmWorkerName"
+              style="font-size: 0.92rem; color: var(--primary); font-weight: 700; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Worker
+              Name</strong>
+            <span id="adminConfirmRecordDate"
+              style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">Recorded: Date / Time</span>
+          </div>
         </div>
         <div class="alert alert-warning"
-          style="background: #FFFBEB; border: 1px solid #FCD34D; color: #92400E; padding: 0.85rem; border-radius: var(--radius-md); font-size: 0.85rem; line-height: 1.4;">
-          <i class="fa-solid fa-shield-halved" style="color: #D97706; margin-right: 0.35rem;"></i>
-          <strong>Notice:</strong> This worker work detail was recorded <strong>more than 24 hours ago</strong>. Site
-          managers are locked from editing this record. As an Admin, do you want to proceed with updating these work
-          details?
+          style="background: #FFFBEB; border: 1px solid #FCD34D; color: #92400E; padding: 0.6rem 0.75rem; border-radius: var(--radius-md); font-size: 0.8rem; line-height: 1.35; margin: 0;">
+          <i class="fa-solid fa-triangle-exclamation" style="color: #D97706; margin-right: 0.3rem;"></i>
+          This record was created >24 hours ago. As an Admin, do you want to proceed with updating it?
         </div>
       </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" onclick="closeModal('adminConfirmModal')">Cancel</button>
-        <button type="button" class="btn btn-accent" id="adminConfirmSubmitBtn">
-          <i class="fa-solid fa-check"></i> Yes, Confirm & Save
+      <div class="modal-footer"
+        style="padding: 0.6rem 1rem; gap: 0.5rem; justify-content: flex-end; border-top: 1px solid var(--border-color, #E2E8F0);">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('adminConfirmModal')"
+          style="padding: 0.35rem 0.85rem; font-size: 0.82rem;">Cancel</button>
+        <button type="button" class="btn btn-accent btn-sm" id="adminConfirmSubmitBtn"
+          style="padding: 0.35rem 0.85rem; font-size: 0.82rem; font-weight: 700;">
+          <i class="fa-solid fa-check"></i> Yes, Save
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Daily Attendance Overwrite Warning Modal (Compact Design) -->
+  <div class="modal-backdrop" id="attendanceOverwriteModal">
+    <div class="modal-box" style="max-width: 400px; border-radius: var(--radius-lg); overflow: hidden;">
+      <div class="modal-header"
+        style="background: linear-gradient(135deg, #FEF3C7, #FDE68A); padding: 0.65rem 1rem; border-bottom: 1px solid #F59E0B;">
+        <h3 class="modal-title"
+          style="color: #78350F; font-size: 0.92rem; font-weight: 700; display:flex; align-items:center; gap:0.4rem;">
+          <i class="fa-solid fa-triangle-exclamation" style="color: #D97706; font-size: 0.95rem;"></i> Overwrite
+          Confirmation
+        </h3>
+        <button class="modal-close" onclick="closeModal('attendanceOverwriteModal')"
+          style="font-size: 1.1rem; line-height: 1;">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 0.85rem 1rem;">
+        <div
+          style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.65rem; background: var(--bg-hover, #F8FAFC); padding: 0.6rem 0.75rem; border-radius: var(--radius-md); border: 1px solid var(--border-color, #E2E8F0);">
+          <div
+            style="width: 38px; height: 38px; border-radius: 50%; background: #FEF3C7; color: #D97706; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">
+            <i class="fa-solid fa-pen-to-square"></i>
+          </div>
+          <div style="line-height: 1.25; overflow: hidden;">
+            <strong id="attendanceOverwriteWorkerName"
+              style="font-size: 0.92rem; color: var(--primary); font-weight: 700; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Worker
+              Name</strong>
+            <span id="attendanceOverwriteRecordDate"
+              style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">Date</span>
+          </div>
+        </div>
+        <div class="alert alert-warning"
+          style="background: #FFFBEB; border: 1px solid #FCD34D; color: #92400E; padding: 0.6rem 0.75rem; border-radius: var(--radius-md); font-size: 0.8rem; line-height: 1.35; margin: 0;">
+          <i class="fa-solid fa-circle-info" style="color: #D97706; margin-right: 0.3rem;"></i>
+          <span id="lblAttendanceOverwriteText">An attendance record already exists. Overwriting will replace the
+            existing time.</span>
+        </div>
+      </div>
+      <div class="modal-footer"
+        style="padding: 0.6rem 1rem; gap: 0.5rem; justify-content: flex-end; border-top: 1px solid var(--border-color, #E2E8F0);">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('attendanceOverwriteModal')"
+          style="padding: 0.35rem 0.85rem; font-size: 0.82rem;">Cancel</button>
+        <button type="button" class="btn btn-warning btn-sm" id="attendanceOverwriteSubmitBtn"
+          style="padding: 0.35rem 0.85rem; font-size: 0.82rem; font-weight: 700;">
+          <i class="fa-solid fa-arrows-rotate"></i> Overwrite
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Daily Attendance Error/Validation Modal (Compact Design matching Face Recognition) -->
+  <div class="modal-backdrop" id="attendanceErrorModal">
+    <div class="modal-box" style="max-width: 400px; border-radius: var(--radius-lg); overflow: hidden;">
+      <div class="modal-header"
+        style="background: linear-gradient(135deg, #FEE2E2, #FECACA); padding: 0.65rem 1rem; border-bottom: 1px solid #F87171;">
+        <h3 class="modal-title"
+          style="color: #991B1B; font-size: 0.92rem; font-weight: 700; display:flex; align-items:center; gap:0.4rem;"
+          id="attendanceErrorModalTitle">
+          <i class="fa-solid fa-circle-xmark" style="color: #DC2626; font-size: 0.95rem;"></i> Invalid Attendance Times
+        </h3>
+        <button class="modal-close" onclick="closeModal('attendanceErrorModal')"
+          style="font-size: 1.1rem; line-height: 1;">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 0.85rem 1rem;">
+        <div class="alert alert-danger"
+          style="background: #FEF2F2; border: 1px solid #FCA5A5; color: #991B1B; padding: 0.75rem 0.85rem; border-radius: var(--radius-md); font-size: 0.82rem; line-height: 1.4; margin: 0; display: flex; align-items: flex-start; gap: 0.5rem;">
+          <i class="fa-solid fa-triangle-exclamation"
+            style="color: #DC2626; font-size: 0.95rem; margin-top: 0.1rem; flex-shrink: 0;"></i>
+          <span id="attendanceErrorModalDetails">Check-In time and Check-Out time cannot be identical.</span>
+        </div>
+      </div>
+      <div class="modal-footer"
+        style="padding: 0.6rem 1rem; justify-content: flex-end; border-top: 1px solid var(--border-color, #E2E8F0);">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('attendanceErrorModal')"
+          style="padding: 0.35rem 0.85rem; font-size: 0.82rem; font-weight: 700;">
+          <i class="fa-solid fa-arrow-left"></i> Adjust Time
         </button>
       </div>
     </div>
@@ -677,8 +1069,8 @@
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.65rem;">
             <div class="form-group" style="margin-bottom:0;">
-              <label class="form-label" style="margin-bottom:0.25rem; font-size:0.8rem;">Phone Contact</label>
-              <input type="text" id="workerPhone" class="form-control" placeholder="+60 12-345 6789"
+              <label class="form-label" style="margin-bottom:0.25rem; font-size:0.8rem;">Basic Salary per hour ($/hr)</label>
+              <input type="number" id="workerHourlyRate" class="form-control" placeholder="e.g. 15.00" step="0.50" min="0"
                 style="padding:0.45rem 0.75rem;">
             </div>
             <div class="form-group" style="margin-bottom:0;">
@@ -706,18 +1098,27 @@
               </select>
             </div>
           </div>
-
           <div class="form-group" style="margin-bottom:0.25rem;">
-            <label class="form-label" style="margin-bottom:0.25rem; font-size:0.8rem;">Worker Picture URL / Image
-              Link</label>
-            <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <label class="form-label" style="margin-bottom:0.25rem; font-size:0.8rem;">Worker Picture URL / Upload
+              Photo</label>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
               <img id="workerPhotoPreview"
-                src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMjQgMjQgZmlsbD0iIzk0QTNCOCI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bTAgNGMxLjkzIDAgMy41IDEuNTcgMy41IDMuNVMxMy45MyAxMyAxMiAxM3MtMy41LTEuNTctMy41LTMuNVMxMC4wNyA2IDEyIDZ6bTAgMThjLTIuMDMgMC0zLjgtLjg1LTUuMDUtMi4yLjAzLTEuNjggMy4zNy0yLjYgNS4wNS0yLjZzNS4wMi45MiA1LjA1IDIuNkMxNS44IDE5LjE1IDE0LjAzIDIwIDEyIDIweiIvPjwvc3ZnPg=="
+                src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMjQgMjQgZmlsbD0iIzk0QTNCOCI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bTAgNGMxLjkzIDAgMy41IDEuNTcgMy41IDMuNVMxMy45MyAxMyAxMiAxM3MtMy41LTEuNTctMy41LTMuNVMxMC4wNyA2AxMiA2em0wIDE4Yy0yLjAzIDAtMy44LS44NS01LjA1LTIuMi4wMy0xLjY8IDMuMzctMi42IDUuMDUtMi42czUuMDIuOTIgNS4wNSAyLjZDMTUuOCAxOS4xNSAxNC4wMyAyMCAxMiAyMHoiLz48L3N2Zz4="
                 onerror="handleImgError(this)"
                 style="width:44px; height:44px; border-radius:50%; object-fit:cover; border:2px solid var(--accent-amber); flex-shrink:0;">
               <input type="text" id="workerPhotoUrl" class="form-control"
                 placeholder="https://example.com/photo.jpg or paste image link" oninput="previewWorkerPhoto()"
-                style="padding:0.45rem 0.75rem;">
+                style="padding:0.45rem 0.75rem; flex: 1;">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="triggerWorkerPhotoFileUpload()"
+                title="Upload photo file from computer">
+                <i class="fa-solid fa-upload"></i> Upload
+              </button>
+              <button type="button" class="btn btn-danger btn-sm" onclick="deleteWorkerPhoto()"
+                title="Delete worker profile picture">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+              <input type="file" id="workerPhotoFileInput" accept="image/*" style="display:none;"
+                onchange="handleWorkerPhotoFileUpload(event)">
             </div>
           </div>
         </div>

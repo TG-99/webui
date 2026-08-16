@@ -43,10 +43,10 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
         "full_name": user.get("full_name", ""),
         "role": user.get("role", "site_manager"),
         "email": user.get("email", ""),
-        "phone": user.get("phone", user.get("email", "")),
+        "phone": user.get("phone", ""),
         "assigned_project_id": user.get("assigned_project_id", ""),
         "assigned_project_name": user.get("assigned_project_name", ""),
-        "allowed_tabs": user.get("allowed_tabs", ["dashboard", "attendance", "workers", "projects", "groups", "reports"])
+        "allowed_tabs": user.get("allowed_tabs", ["dashboard", "face-scanner", "attendance", "workers", "projects", "groups", "reports"])
     }
 
 def require_admin(current_user: dict = Depends(get_current_user)):
