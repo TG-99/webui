@@ -1,7 +1,6 @@
 import os
 import urllib.request
 import pickle
-import base64
 from contextlib import asynccontextmanager
 
 import io
@@ -16,7 +15,6 @@ from bson import ObjectId
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
-
 
 from database import get_db, init_db, verify_password, hash_password
 from auth import create_access_token, get_current_user, require_admin
@@ -479,7 +477,7 @@ def update_worker(worker_id: str, worker: WorkerModel, current_user: dict = Depe
     old_pic = (existing_worker.get("picture_url") or "").strip()
     new_pic = (doc.get("picture_url") or "").strip()
 
-    res = db.workers.update_one({"_id": oid}, {"$set": doc})
+    db.workers.update_one({"_id": oid}, {"$set": doc})
     
     # If picture_url was modified or removed, unset face_descriptor so AI engine re-indexes it
     if old_pic != new_pic:
@@ -926,15 +924,32 @@ def fetch_bulk_attendance_matrix_data(db, current_user, worker_ids=None, start_d
             query["project_id"] = current_user["assigned_project_id"]
         except: pass
 
-    # Fetch workers sorted by name
-    workers_cursor = db.workers.find(query).sort("name", 1)
+    # Fetch workers in addition order (natural MongoDB insertion order)
+    workers_cursor = db.workers.find(query)
     workers = [serialize_doc(w) for w in workers_cursor]
+
+    # If specific worker_ids order was provided, preserve that exact requested order
+    if worker_ids and len(worker_ids) > 0:
+        order_map = {wid: idx for idx, wid in enumerate(worker_ids)}
+        workers.sort(key=lambda w: order_map.get(w["id"], 999999))
 
     # Filter further by project_name / group_name if provided
     if project_name and project_name != "All":
         workers = [w for w in workers if w.get("project_name") == project_name]
     if group_name and group_name != "All":
         workers = [w for w in workers if w.get("group_name") == group_name]
+    else:
+        # Group workers by (project_name, group_name) maintaining addition order of groups
+        grouped = {}
+        for w in workers:
+            key = ((w.get("project_name") or "").strip(), (w.get("group_name") or "").strip())
+            if key not in grouped:
+                grouped[key] = []
+            grouped[key].append(w)
+        ordered_workers = []
+        for grp in grouped.values():
+            ordered_workers.extend(grp)
+        workers = ordered_workers
 
     # Generate dates range
     try:
@@ -1123,61 +1138,122 @@ def export_bulk_attendance_excel(
         c.fill = fill_header
         c.border = thin_border
 
-    banner_row = 6
-    banner_text = req.title_banner or data["banner"]
     last_col_letter = get_column_letter(total_col_idx)
-    ws.merge_cells(f"A{banner_row}:{last_col_letter}{banner_row}")
-    b_cell = ws.cell(row=banner_row, column=1, value=banner_text)
-    b_cell.font = font_banner
-    b_cell.alignment = align_center
-    b_cell.fill = fill_banner
-    for c in range(1, total_col_idx + 1):
-        ws.cell(row=banner_row, column=c).border = thin_border
-
     workers = data["workers"]
     matrix = data["matrix"]
-    current_row = 7
+    current_row = 6
 
-    for idx, w in enumerate(workers):
-        wid = w["id"]
-        w_data = matrix.get(wid, {"daily_hours": {}, "total_hours": 0.0})
-        daily_hours = w_data["daily_hours"]
-        tot = w_data["total_hours"]
+    is_all_groups = not req.group_name or req.group_name == "All"
 
-        c1 = ws.cell(row=current_row, column=1, value=idx + 1)
-        c1.alignment = align_center
-        c1.font = font_data_normal
-        c1.border = thin_border
+    if is_all_groups:
+        group_map = {}
+        for w in workers:
+            p_name = (w.get("project_name") or "").strip()
+            g_name = (w.get("group_name") or "").strip()
+            if p_name and g_name:
+                label = f"{p_name} - {g_name}"
+            elif g_name:
+                label = g_name
+            elif p_name:
+                label = p_name
+            else:
+                label = "Unassigned"
 
-        c2 = ws.cell(row=current_row, column=2, value=str(w.get("name", "")).upper())
-        c2.alignment = align_left
-        c2.font = font_worker_name
-        c2.fill = fill_worker_name
-        c2.border = thin_border
+            if label not in group_map:
+                group_map[label] = []
+            group_map[label].append(w)
 
-        c3 = ws.cell(row=current_row, column=3, value=w.get("passport_number") or "—")
-        c3.alignment = align_center
-        c3.font = font_data_normal
-        c3.border = thin_border
+        for group_label, group_workers in group_map.items():
+            ws.merge_cells(f"A{current_row}:{last_col_letter}{current_row}")
+            grp_cell = ws.cell(row=current_row, column=1, value=group_label.upper())
+            grp_cell.font = font_banner
+            grp_cell.alignment = align_center
+            grp_cell.fill = fill_banner
+            for c in range(1, total_col_idx + 1):
+                ws.cell(row=current_row, column=c).border = thin_border
+            current_row += 1
 
-        for i, d_info in enumerate(dates):
-            c_idx = 4 + i
-            d_str = d_info["date"]
-            val = daily_hours.get(d_str, 0.0)
-            val_display = int(val) if val.is_integer() else val
-            cell = ws.cell(row=current_row, column=c_idx, value=val_display)
-            cell.alignment = align_center
-            cell.font = font_data_sunday if d_info["is_sunday"] else font_data_normal
-            cell.border = thin_border
+            for idx, w in enumerate(group_workers):
+                wid = w["id"]
+                w_data = matrix.get(wid, {"daily_hours": {}, "total_hours": 0.0})
+                daily_hours = w_data["daily_hours"]
+                tot = w_data["total_hours"]
 
-        tot_display = int(tot) if isinstance(tot, (int, float)) and float(tot).is_integer() else tot
-        c_tot = ws.cell(row=current_row, column=total_col_idx, value=tot_display)
-        c_tot.alignment = align_center
-        c_tot.font = font_total
-        c_tot.fill = fill_total
-        c_tot.border = thin_border
+                c1 = ws.cell(row=current_row, column=1, value=idx + 1)
+                c1.alignment = align_center
+                c1.font = font_data_normal
+                c1.border = thin_border
 
-        current_row += 1
+                c2 = ws.cell(row=current_row, column=2, value=str(w.get("name", "")).upper())
+                c2.alignment = align_left
+                c2.font = font_worker_name
+                c2.fill = fill_worker_name
+                c2.border = thin_border
+
+                c3 = ws.cell(row=current_row, column=3, value=w.get("passport_number") or "—")
+                c3.alignment = align_center
+                c3.font = font_data_normal
+                c3.border = thin_border
+
+                for i, d_info in enumerate(dates):
+                    c_idx = 4 + i
+                    d_str = d_info["date"]
+                    val = daily_hours.get(d_str, 0.0)
+                    val_display = int(val) if isinstance(val, (int, float)) and float(val).is_integer() else val
+                    cell = ws.cell(row=current_row, column=c_idx, value=val_display)
+                    cell.alignment = align_center
+                    cell.font = font_data_sunday if d_info["is_sunday"] else font_data_normal
+                    cell.border = thin_border
+
+                tot_display = int(tot) if isinstance(tot, (int, float)) and float(tot).is_integer() else tot
+                c_tot = ws.cell(row=current_row, column=total_col_idx, value=tot_display)
+                c_tot.alignment = align_center
+                c_tot.font = font_total
+                c_tot.fill = fill_total
+                c_tot.border = thin_border
+
+                current_row += 1
+    else:
+        for idx, w in enumerate(workers):
+            wid = w["id"]
+            w_data = matrix.get(wid, {"daily_hours": {}, "total_hours": 0.0})
+            daily_hours = w_data["daily_hours"]
+            tot = w_data["total_hours"]
+
+            c1 = ws.cell(row=current_row, column=1, value=idx + 1)
+            c1.alignment = align_center
+            c1.font = font_data_normal
+            c1.border = thin_border
+
+            c2 = ws.cell(row=current_row, column=2, value=str(w.get("name", "")).upper())
+            c2.alignment = align_left
+            c2.font = font_worker_name
+            c2.fill = fill_worker_name
+            c2.border = thin_border
+
+            c3 = ws.cell(row=current_row, column=3, value=w.get("passport_number") or "—")
+            c3.alignment = align_center
+            c3.font = font_data_normal
+            c3.border = thin_border
+
+            for i, d_info in enumerate(dates):
+                c_idx = 4 + i
+                d_str = d_info["date"]
+                val = daily_hours.get(d_str, 0.0)
+                val_display = int(val) if isinstance(val, (int, float)) and float(val).is_integer() else val
+                cell = ws.cell(row=current_row, column=c_idx, value=val_display)
+                cell.alignment = align_center
+                cell.font = font_data_sunday if d_info["is_sunday"] else font_data_normal
+                cell.border = thin_border
+
+            tot_display = int(tot) if isinstance(tot, (int, float)) and float(tot).is_integer() else tot
+            c_tot = ws.cell(row=current_row, column=total_col_idx, value=tot_display)
+            c_tot.alignment = align_center
+            c_tot.font = font_total
+            c_tot.fill = fill_total
+            c_tot.border = thin_border
+
+            current_row += 1
 
     ws.column_dimensions["A"].width = 6
     ws.column_dimensions["B"].width = 24

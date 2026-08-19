@@ -1075,37 +1075,85 @@ async function lookupBulkWorkerDetails() {
         ${dates.map(d => `<th class="${d.is_sunday ? 'th-sunday' : ''}">${d.formatted}<br>${d.day}</th>`).join('')}
         <th style="min-width:110px; background-color:#FEF08A; color:#713F12;">TOTAL HOURS</th>
       </tr>
-      <tr class="banner-row">
-        <th colspan="${totalCols}">${escapeHtml(data.banner)}</th>
-      </tr>
     `;
     document.getElementById('bulkMatrixThead').innerHTML = theadHtml;
 
     let tbodyHtml = '';
-    workers.forEach((w, idx) => {
-      const wid = w.id;
-      const w_data = matrix[wid] || { daily_hours: {}, total_hours: 0 };
-      const d_hours = w_data.daily_hours || {};
-      const tot = w_data.total_hours || 0;
+    const isAllGroups = (gFilter === 'All');
 
-      const dailyCells = dates.map(d => {
-        const val = d_hours[d.date] || 0;
-        const valDisplay = val > 0 ? (Number.isInteger(val) ? val : val.toFixed(1)) : '0';
-        return `<td class="${d.is_sunday ? 'td-sunday' : ''}">${valDisplay}</td>`;
-      }).join('');
+    if (isAllGroups) {
+      const groupMap = new Map();
+      workers.forEach(w => {
+        const pName = (w.project_name || '').trim();
+        const gName = (w.group_name || '').trim();
+        let label = 'Unassigned';
+        if (pName && gName) label = `${pName} - ${gName}`;
+        else if (gName) label = gName;
+        else if (pName) label = pName;
 
-      const totDisplay = Number.isInteger(tot) ? tot : tot.toFixed(1);
+        if (!groupMap.has(label)) {
+          groupMap.set(label, []);
+        }
+        groupMap.get(label).push(w);
+      });
 
-      tbodyHtml += `
-        <tr>
-          <td class="col-no">${idx + 1}</td>
-          <td class="col-name">${escapeHtml((w.name || '').toUpperCase())}</td>
-          <td class="col-passport">${escapeHtml(w.passport_number || '—')}</td>
-          ${dailyCells}
-          <td class="col-total">${totDisplay}</td>
-        </tr>
-      `;
-    });
+      groupMap.forEach((groupWorkers, groupLabel) => {
+        tbodyHtml += `
+          <tr class="group-separator-row">
+            <td colspan="${totalCols}">${escapeHtml(groupLabel.toUpperCase())}</td>
+          </tr>
+        `;
+        groupWorkers.forEach((w, idx) => {
+          const wid = w.id;
+          const w_data = matrix[wid] || { daily_hours: {}, total_hours: 0 };
+          const d_hours = w_data.daily_hours || {};
+          const tot = w_data.total_hours || 0;
+
+          const dailyCells = dates.map(d => {
+            const val = d_hours[d.date] || 0;
+            const valDisplay = val > 0 ? (Number.isInteger(val) ? val : val.toFixed(1)) : '0';
+            return `<td class="${d.is_sunday ? 'td-sunday' : ''}">${valDisplay}</td>`;
+          }).join('');
+
+          const totDisplay = Number.isInteger(tot) ? tot : tot.toFixed(1);
+
+          tbodyHtml += `
+            <tr>
+              <td class="col-no">${idx + 1}</td>
+              <td class="col-name">${escapeHtml((w.name || '').toUpperCase())}</td>
+              <td class="col-passport">${escapeHtml(w.passport_number || '—')}</td>
+              ${dailyCells}
+              <td class="col-total">${totDisplay}</td>
+            </tr>
+          `;
+        });
+      });
+    } else {
+      workers.forEach((w, idx) => {
+        const wid = w.id;
+        const w_data = matrix[wid] || { daily_hours: {}, total_hours: 0 };
+        const d_hours = w_data.daily_hours || {};
+        const tot = w_data.total_hours || 0;
+
+        const dailyCells = dates.map(d => {
+          const val = d_hours[d.date] || 0;
+          const valDisplay = val > 0 ? (Number.isInteger(val) ? val : val.toFixed(1)) : '0';
+          return `<td class="${d.is_sunday ? 'td-sunday' : ''}">${valDisplay}</td>`;
+        }).join('');
+
+        const totDisplay = Number.isInteger(tot) ? tot : tot.toFixed(1);
+
+        tbodyHtml += `
+          <tr>
+            <td class="col-no">${idx + 1}</td>
+            <td class="col-name">${escapeHtml((w.name || '').toUpperCase())}</td>
+            <td class="col-passport">${escapeHtml(w.passport_number || '—')}</td>
+            ${dailyCells}
+            <td class="col-total">${totDisplay}</td>
+          </tr>
+        `;
+      });
+    }
     document.getElementById('bulkMatrixTbody').innerHTML = tbodyHtml;
 
     resultEl.style.display = 'block';
@@ -1185,32 +1233,79 @@ function exportBulkAttendancePDF() {
   }
 
   const dateThs = dates.map(d => `<th class="${d.is_sunday ? 'sun-header' : ''}">${d.formatted}<br>${d.day}</th>`).join('');
+  const gFilter = document.getElementById('bulkLookupGroupSelect')?.value || 'All';
+  const isAllGroups = (gFilter === 'All');
 
   let rowsHtml = '';
-  workers.forEach((w, idx) => {
-    const wid = w.id;
-    const w_data = matrix[wid] || { daily_hours: {}, total_hours: 0 };
-    const d_hours = w_data.daily_hours || {};
-    const tot = w_data.total_hours || 0;
+  if (isAllGroups) {
+    const groupMap = new Map();
+    workers.forEach(w => {
+      const pName = (w.project_name || '').trim();
+      const gName = (w.group_name || '').trim();
+      let label = 'Unassigned';
+      if (pName && gName) label = `${pName} - ${gName}`;
+      else if (gName) label = gName;
+      else if (pName) label = pName;
 
-    const dailyCells = dates.map(d => {
-      const val = d_hours[d.date] || 0;
-      const valDisplay = val > 0 ? (Number.isInteger(val) ? val : val.toFixed(1)) : '0';
-      return `<td class="${d.is_sunday ? 'sun-cell' : ''}">${valDisplay}</td>`;
-    }).join('');
+      if (!groupMap.has(label)) {
+        groupMap.set(label, []);
+      }
+      groupMap.get(label).push(w);
+    });
 
-    rowsHtml += `
-      <tr>
-        <td style="text-align:center;">${idx + 1}</td>
-        <td class="name-cell">${escapeHtml((w.name || '').toUpperCase())}</td>
-        <td style="text-align:center;">${escapeHtml(w.passport_number || '—')}</td>
-        ${dailyCells}
-        <td class="total-cell">${tot}</td>
-      </tr>
-    `;
-  });
+    groupMap.forEach((groupWorkers, groupLabel) => {
+      rowsHtml += `
+        <tr class="banner-row">
+          <td colspan="${4 + dates.length}" style="text-align:center; font-weight:bold; background:#E2E8F0; font-size:11px;">${escapeHtml(groupLabel.toUpperCase())}</td>
+        </tr>
+      `;
+      groupWorkers.forEach((w, idx) => {
+        const wid = w.id;
+        const w_data = matrix[wid] || { daily_hours: {}, total_hours: 0 };
+        const d_hours = w_data.daily_hours || {};
+        const tot = w_data.total_hours || 0;
 
-  const totalCols = 4 + dates.length;
+        const dailyCells = dates.map(d => {
+          const val = d_hours[d.date] || 0;
+          const valDisplay = val > 0 ? (Number.isInteger(val) ? val : val.toFixed(1)) : '0';
+          return `<td class="${d.is_sunday ? 'sun-cell' : ''}">${valDisplay}</td>`;
+        }).join('');
+
+        rowsHtml += `
+          <tr>
+            <td style="text-align:center;">${idx + 1}</td>
+            <td class="name-cell">${escapeHtml((w.name || '').toUpperCase())}</td>
+            <td style="text-align:center;">${escapeHtml(w.passport_number || '—')}</td>
+            ${dailyCells}
+            <td class="total-cell">${tot}</td>
+          </tr>
+        `;
+      });
+    });
+  } else {
+    workers.forEach((w, idx) => {
+      const wid = w.id;
+      const w_data = matrix[wid] || { daily_hours: {}, total_hours: 0 };
+      const d_hours = w_data.daily_hours || {};
+      const tot = w_data.total_hours || 0;
+
+      const dailyCells = dates.map(d => {
+        const val = d_hours[d.date] || 0;
+        const valDisplay = val > 0 ? (Number.isInteger(val) ? val : val.toFixed(1)) : '0';
+        return `<td class="${d.is_sunday ? 'sun-cell' : ''}">${valDisplay}</td>`;
+      }).join('');
+
+      rowsHtml += `
+        <tr>
+          <td style="text-align:center;">${idx + 1}</td>
+          <td class="name-cell">${escapeHtml((w.name || '').toUpperCase())}</td>
+          <td style="text-align:center;">${escapeHtml(w.passport_number || '—')}</td>
+          ${dailyCells}
+          <td class="total-cell">${tot}</td>
+        </tr>
+      `;
+    });
+  }
 
   printWin.document.write(`
     <!DOCTYPE html>
@@ -1244,9 +1339,6 @@ function exportBulkAttendancePDF() {
             <th>PASSPORT No.</th>
             ${dateThs}
             <th style="background:#FFFF00;">TOTAL HOURS</th>
-          </tr>
-          <tr class="banner-row">
-            <th colspan="${totalCols}">${escapeHtml(data.banner)}</th>
           </tr>
         </thead>
         <tbody>
