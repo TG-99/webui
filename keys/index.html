@@ -1,0 +1,675 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="Community keybox repository for Android attestation — every keybox verified live against Google's revocation list. Download strong, valid keyboxes for TrickyStore / Tricky Store." />
+<title>Keybox Repository · live-verified Android keyboxes</title>
+<link rel="icon" type="image/webp" href="/assets/emblem.webp" />
+<link rel="apple-touch-icon" href="/assets/emblem.webp" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Keybox Repository · live-verified Android keyboxes" />
+<meta property="og:description" content="Every keybox checked live against Google's revocation list. Valid keys first, revoked ones archived — all free to download." />
+<meta property="og:image" content="/assets/hero.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>
+  (function () {
+    var t = localStorage.getItem('theme');
+    if (t === 'dark' || (t !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches))
+      document.documentElement.classList.add('dark');
+  })();
+</script>
+<style>
+  :root{
+    --bg:oklch(100% 0 0); --fg:oklch(14.5% 0 0);
+    --card:oklch(100% 0 0); --card2:oklch(98.4% .001 286);
+    --muted:oklch(96.5% .001 286.375); --muted-fg:oklch(52% .012 277.508);
+    --border:oklch(92.2% .004 286.778);
+    --primary:oklch(54.6% .245 262.881); --primary-fg:oklch(98.5% 0 0);
+    --green:oklch(56% .16 149.6); --amber:oklch(61% .16 62); --red:oklch(57% .22 25.3);
+    --glass-bg:#ffffffcc; --glass-border:#00000010;
+    --radius:.75rem; --maxw:1000px;
+    --sans:'Inter',ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --shadow:0 1px 2px #0000000d,0 12px 28px -14px #0000001f;
+    --shadow-lg:0 1px 2px #0000000d,0 30px 60px -24px #00000026;
+  }
+  html.dark{
+    --bg:oklch(13% 0 0); --fg:oklch(98.5% 0 0);
+    --card:oklch(17.5% 0 0); --card2:oklch(20.5% 0 0);
+    --muted:oklch(25.5% 0 0); --muted-fg:oklch(66% 0 0);
+    --border:oklch(100% 0 0/.09);
+    --green:oklch(75% .19 150); --amber:oklch(80% .16 72); --red:oklch(66% .22 25.3);
+    --glass-bg:#151515cc; --glass-border:#ffffff14;
+    --shadow:0 1px 2px #00000040,0 16px 36px -18px #000000d0;
+    --shadow-lg:0 1px 2px #00000050,0 40px 80px -30px #000000e6;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);
+    font-size:15.5px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  a{color:inherit;text-decoration:none}
+  h1,h2,h3{letter-spacing:-.025em;line-height:1.12;margin:0}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 22px}
+  .bgfx{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none;transform:translateZ(0)}
+  .herobg{position:absolute;top:0;left:0;right:0;height:760px;background:url('/assets/hero.webp') center top/cover no-repeat;
+    -webkit-mask-image:linear-gradient(to bottom,#000 0%,#000 34%,transparent 82%);
+    mask-image:linear-gradient(to bottom,#000 0%,#000 34%,transparent 82%);opacity:0}
+  html.dark .herobg{opacity:.9}
+  .blob{position:absolute;border-radius:50%;filter:blur(48px);opacity:.32;transform:translateZ(0)}
+  html.dark .blob.a{opacity:.2}
+  .blob.a{top:-160px;left:50%;transform:translateX(-50%);width:720px;height:520px;
+    background:radial-gradient(closest-side,color-mix(in oklab,var(--primary) 40%,transparent),transparent)}
+  .blob.b{top:520px;right:-140px;width:420px;height:420px;
+    background:radial-gradient(closest-side,color-mix(in oklab,var(--green) 34%,transparent),transparent);opacity:.25}
+  .blob.c{top:1200px;left:-160px;width:460px;height:460px;
+    background:radial-gradient(closest-side,color-mix(in oklab,oklch(62% .21 300) 34%,transparent),transparent);opacity:.22}
+
+  /* ---------- nav ---------- */
+  nav{position:sticky;top:0;z-index:40;background:color-mix(in oklab,var(--bg) 88%,transparent);
+    border-bottom:1px solid var(--border)}
+  .nav-in{max-width:var(--maxw);margin:0 auto;padding:11px 22px;display:flex;align-items:center;gap:16px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15.5px}
+  .brand .mk{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;color:#fff;
+    background:linear-gradient(140deg,var(--primary),oklch(60% .2 295));box-shadow:0 6px 16px -6px color-mix(in oklab,var(--primary) 70%,transparent)}
+  .brand .mk svg{width:17px;height:17px}
+  .navlinks{display:flex;gap:4px;margin-left:6px}
+  .navlinks a{padding:7px 11px;border-radius:8px;font-size:14px;font-weight:500;color:var(--muted-fg);transition:.15s}
+  .navlinks a:hover{color:var(--fg);background:var(--muted)}
+  .nav-sp{flex:1}
+  .iconbtn{width:36px;height:36px;border-radius:9px;border:1px solid var(--border);background:transparent;
+    color:var(--fg);cursor:pointer;display:grid;place-items:center;transition:.15s}
+  .iconbtn:hover{background:var(--muted)}
+  .iconbtn svg{width:18px;height:18px}
+  @media (max-width:760px){.navlinks{display:none}}
+
+  /* ---------- hero ---------- */
+  .hero{padding:74px 0 44px;text-align:center}
+  .pill{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--muted-fg);
+    border:1px solid var(--border);background:var(--card);padding:6px 14px;border-radius:999px;box-shadow:var(--shadow)}
+  .pill .live{width:8px;height:8px;border-radius:50%;background:var(--green);position:relative}
+  .pill .live::after{content:"";position:absolute;inset:-4px;border-radius:50%;
+    background:color-mix(in oklab,var(--green) 60%,transparent);animation:ping 1.8s cubic-bezier(0,0,.2,1) infinite}
+  @keyframes ping{75%,100%{transform:scale(2.4);opacity:0}}
+  .hero h1{font-size:clamp(34px,6.4vw,60px);font-weight:800;margin:20px 0 0;letter-spacing:-.04em}
+  .hero h1 .grad{background:linear-gradient(120deg,var(--primary),oklch(64% .2 300) 60%,var(--green));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p.lede{max-width:600px;margin:20px auto 0;color:var(--muted-fg);font-size:18px}
+  .cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:30px}
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:12px 20px;border-radius:11px;font-weight:650;
+    font-size:15px;border:1px solid var(--border);background:var(--card);color:var(--fg);cursor:pointer;
+    transition:.16s;box-shadow:var(--shadow)}
+  .btn:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+  .btn svg{width:17px;height:17px}
+  .btn.primary{background:var(--primary);border-color:var(--primary);color:var(--primary-fg)}
+  .btn.tg{background:#229ED9;border-color:#229ED9;color:#fff}
+
+  /* ---------- stats ---------- */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:38px 0 8px}
+  .stat{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px 16px;box-shadow:var(--shadow)}
+  .stat b{display:block;font-size:30px;font-weight:800;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums}
+  .stat span{display:block;margin-top:6px;font-size:12.5px;color:var(--muted-fg);font-weight:500}
+  .stat.ok b{color:var(--green)} .stat.bad b{color:var(--red)} .stat.pri b{color:var(--primary)}
+  @media (max-width:640px){.stats{grid-template-columns:repeat(2,1fr)}}
+
+  /* ---------- section frame ---------- */
+  section.blk{padding:56px 0}
+  .eyebrow{font-family:var(--mono);font-size:12.5px;font-weight:600;color:var(--primary);
+    text-transform:uppercase;letter-spacing:.14em;margin-bottom:12px}
+  .blk h2{font-size:clamp(24px,3.6vw,34px);font-weight:750}
+  .blk .sub{color:var(--muted-fg);margin-top:10px;max-width:620px;font-size:16px}
+
+  /* ---------- keybox list ---------- */
+  .toolbar{display:flex;align-items:center;gap:10px;margin:22px 0 14px;flex-wrap:wrap}
+  .verified{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--muted-fg);font-family:var(--mono)}
+  .verified svg{width:15px;height:15px;color:var(--green)}
+  .kcard{display:flex;align-items:center;gap:16px;padding:16px 18px;margin-bottom:11px;background:var(--card);
+    border:1px solid var(--border);border-radius:15px;box-shadow:var(--shadow);transition:.16s}
+  .kcard:hover{border-color:color-mix(in oklab,var(--primary) 45%,var(--border));transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+  .kcard.dim{opacity:.58}
+  .kicon{width:42px;height:42px;flex:none;border-radius:11px;display:grid;place-items:center;
+    background:var(--muted);color:var(--muted-fg)}
+  .kcard.g-strong .kicon,.kcard.g-valid .kicon{background:color-mix(in oklab,var(--green) 16%,transparent);color:var(--green)}
+  .kcard.g-soft .kicon,.kcard.g-basic .kicon{background:color-mix(in oklab,var(--amber) 16%,transparent);color:var(--amber)}
+  .kcard.g-revoked .kicon{background:color-mix(in oklab,var(--red) 16%,transparent);color:var(--red)}
+  .kicon svg{width:20px;height:20px}
+  .kmain{flex:1;min-width:0}
+  .kname{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-weight:650;font-size:15px}
+  .kname .fn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px}
+  .kmeta{margin-top:5px;font-size:12.5px;color:var(--muted-fg);font-family:var(--mono);display:flex;gap:14px;flex-wrap:wrap}
+  .badge{font-size:11px;font-weight:750;letter-spacing:.02em;padding:3px 9px;border-radius:999px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+  .badge::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+  .b-strong,.b-valid{color:var(--green);background:color-mix(in oklab,var(--green) 15%,transparent)}
+  .b-soft,.b-basic{color:var(--amber);background:color-mix(in oklab,var(--amber) 15%,transparent)}
+  .b-revoked{color:var(--red);background:color-mix(in oklab,var(--red) 15%,transparent)}
+  .b-unknown{color:var(--muted-fg);background:var(--muted)}
+  .b-new{color:var(--primary);background:color-mix(in oklab,var(--primary) 14%,transparent)}
+  .b-live{color:var(--primary);background:color-mix(in oklab,var(--primary) 18%,transparent)}
+  .b-live::before{animation:pulse 2.2s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in oklab,var(--primary) 50%,transparent)}70%{box-shadow:0 0 0 6px transparent}100%{box-shadow:0 0 0 0 transparent}}
+  .kact{display:flex;gap:8px;flex-shrink:0}
+  .sbtn{display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:9px;font-weight:600;
+    font-size:13.5px;border:1px solid var(--border);background:transparent;color:var(--fg);cursor:pointer;transition:.15s}
+  .sbtn:hover{background:var(--muted)}
+  .sbtn.primary{background:var(--primary);border-color:var(--primary);color:var(--primary-fg)}
+  .sbtn svg{width:15px;height:15px}
+  .sec-label{display:flex;align-items:center;gap:10px;margin:28px 2px 14px;color:var(--muted-fg);
+    font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.09em}
+  .sec-label::after{content:"";flex:1;height:1px;background:var(--border)}
+  .spin{width:24px;height:24px;border:2.5px solid var(--border);border-top-color:var(--primary);border-radius:50%;
+    animation:rot .7s linear infinite;margin:46px auto}
+  @keyframes rot{to{transform:rotate(360deg)}}
+  .empty{text-align:center;color:var(--muted-fg);padding:44px 0}
+
+  /* ---------- steps / grid cards ---------- */
+  .grid3{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:26px}
+  @media (max-width:860px){.grid3{grid-template-columns:repeat(2,1fr)}}
+  @media (max-width:460px){.grid3{grid-template-columns:1fr}}
+  .fcard{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;box-shadow:var(--shadow)}
+  .fcard .n{font-family:var(--mono);font-size:12px;color:var(--primary);font-weight:600}
+  .fcard .ic{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;margin:8px 0 12px;
+    background:color-mix(in oklab,var(--primary) 12%,transparent);color:var(--primary)}
+  .fcard .ic svg{width:20px;height:20px}
+  .fcard h3{font-size:16px;font-weight:680}
+  .fcard p{margin:7px 0 0;font-size:13.8px;color:var(--muted-fg)}
+
+  .grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:26px}
+  @media (max-width:720px){.grid2{grid-template-columns:1fr}}
+  .scard{display:flex;gap:14px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px;box-shadow:var(--shadow)}
+  .scard .dots{flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;padding-top:3px}
+  .dot{width:11px;height:11px;border-radius:50%}
+  .dg{background:var(--green)} .dr{background:var(--red)} .do{background:var(--border)}
+  .scard h3{font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px}
+  .scard p{margin:6px 0 0;font-size:13.8px;color:var(--muted-fg)}
+
+  /* ---------- guide ---------- */
+  .steps{margin-top:26px;display:flex;flex-direction:column;gap:2px}
+  .step{display:flex;gap:16px;padding:16px 0;border-top:1px solid var(--border)}
+  .step:first-child{border-top:0}
+  .step .num{flex:none;width:30px;height:30px;border-radius:9px;background:var(--primary);color:var(--primary-fg);
+    display:grid;place-items:center;font-weight:700;font-size:14px}
+  .step h3{font-size:15.5px;font-weight:650}
+  .step p{margin:5px 0 0;font-size:14px;color:var(--muted-fg)}
+  code.inline{font-family:var(--mono);font-size:12.5px;background:var(--muted);padding:2px 7px;border-radius:6px}
+  pre.code{margin:10px 0 0;background:oklch(16% 0 0);color:oklch(92% 0 0);border:1px solid var(--border);
+    border-radius:11px;padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:12.8px;line-height:1.7}
+  html:not(.dark) pre.code{background:oklch(21% 0 0)}
+  pre.code .c{color:oklch(62% .03 150)} pre.code .p{color:oklch(72% .17 260)}
+
+  /* ---------- faq ---------- */
+  .faq{margin-top:22px;border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--card);box-shadow:var(--shadow)}
+  details{border-top:1px solid var(--border)}
+  details:first-child{border-top:0}
+  summary{padding:16px 18px;font-weight:600;cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:15px}
+  summary::-webkit-details-marker{display:none}
+  summary .chev{width:18px;height:18px;flex:none;color:var(--muted-fg);transition:.2s}
+  details[open] summary .chev{transform:rotate(180deg)}
+  details .ans{padding:0 18px 18px;color:var(--muted-fg);font-size:14.3px}
+  details .ans a{color:var(--primary)}
+
+  /* ---------- footer ---------- */
+  footer{border-top:1px solid var(--border);margin-top:40px;background:var(--card2)}
+  .foot{max-width:var(--maxw);margin:0 auto;padding:48px 22px 28px;display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:28px}
+  @media (max-width:760px){.foot{grid-template-columns:1fr 1fr}}
+  @media (max-width:440px){.foot{grid-template-columns:1fr}}
+  .foot h4{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted-fg);margin:0 0 12px;font-weight:700}
+  .foot a{display:flex;align-items:center;gap:8px;color:var(--muted-fg);font-size:14px;padding:5px 0;transition:.15s}
+  .foot a:hover{color:var(--fg)}
+  .foot a svg{width:15px;height:15px}
+  .foot .about p{color:var(--muted-fg);font-size:13.8px;margin:10px 0 0;max-width:280px}
+  .foot-b{border-top:1px solid var(--border)}
+  .foot-b .in{max-width:var(--maxw);margin:0 auto;padding:16px 22px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:var(--muted-fg);font-size:12.5px}
+
+  /* ---- github projects ---- */
+  .repo-feat{display:block;background:var(--card);border:1px solid var(--border);border-radius:18px;
+    padding:22px;box-shadow:var(--shadow);transition:.16s;position:relative;overflow:hidden;margin-top:26px}
+  .repo-feat::before{content:"";position:absolute;top:-50px;right:-50px;width:200px;height:200px;border-radius:50%;
+    background:radial-gradient(closest-side,color-mix(in oklab,var(--primary) 22%,transparent),transparent);pointer-events:none}
+  .repo-feat:hover{border-color:color-mix(in oklab,var(--primary) 45%,var(--border));transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+  .repo-top{display:flex;align-items:center;gap:12px;position:relative}
+  .repo-ic{width:44px;height:44px;border-radius:12px;flex:none;display:grid;place-items:center;background:var(--muted);color:var(--fg)}
+  .repo-ic svg{width:23px;height:23px}
+  .repo-name{font-weight:750;font-size:17px}
+  .repo-sub{color:var(--muted-fg);font-size:12.5px;font-family:var(--mono);margin-top:2px}
+  .repo-star{margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-weight:750;font-size:15px;color:var(--amber);flex:none}
+  .repo-star svg{width:16px;height:16px}
+  .repo-desc{margin:14px 0 0;color:var(--muted-fg);font-size:14.5px;max-width:640px}
+  .repo-tags{display:flex;gap:7px;flex-wrap:wrap;margin-top:14px}
+  .repo-tag{font-size:11.5px;font-weight:600;color:var(--primary);background:color-mix(in oklab,var(--primary) 12%,transparent);padding:3px 10px;border-radius:999px}
+  .repo-open{display:inline-flex;align-items:center;gap:7px;margin-top:18px;font-weight:650;color:var(--primary)}
+  .repo-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+  @media (max-width:680px){.repo-grid{grid-template-columns:1fr}}
+  .repo-card{display:block;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:var(--shadow);transition:.16s}
+  .repo-card:hover{border-color:color-mix(in oklab,var(--primary) 40%,var(--border));transform:translateY(-2px)}
+  .repo-card .repo-name{font-size:15px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .repo-card .repo-star{font-size:13px}
+  .repo-card p{margin:6px 0 0;color:var(--muted-fg);font-size:13px}
+
+  /* ad */
+  .ad{width:100%;min-height:90px;display:grid;place-items:center;margin:8px 0;
+    background:var(--card);border:1px dashed var(--border);border-radius:14px;color:var(--muted-fg);font-size:13px}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--fg);
+    color:var(--bg);padding:11px 20px;border-radius:999px;font-weight:600;font-size:14px;opacity:0;
+    transition:.22s;pointer-events:none;z-index:60;box-shadow:var(--shadow-lg)}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .reveal{opacity:0;transform:translateY(18px)}
+  .reveal.in{opacity:1;transform:none;transition:opacity .6s ease,transform .6s cubic-bezier(.16,1,.3,1)}
+  @media (max-width:560px){.kcard{flex-wrap:wrap}.kact{width:100%}.sbtn{flex:1;justify-content:center}.kname .fn{max-width:180px}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto}.reveal{opacity:1;transform:none}}
+
+  /* ---- interactive layer ---- */
+  :root{--sp:#22c55e}
+  .fcard,.scard{transform-style:preserve-3d}
+
+  /* ---- grade emblem (compact, timer-driven color cycle — zero scroll effect) ---- */
+  .grade-hero{display:flex;align-items:center;gap:26px;margin:24px 0 10px;flex-wrap:wrap;
+    background:var(--card);border:1px solid var(--border);border-radius:18px;padding:20px 24px;box-shadow:var(--shadow)}
+  .ghero-stage{position:relative;width:116px;height:116px;flex:none;display:grid;place-items:center}
+  .ghero-glow{position:absolute;width:116px;height:116px;border-radius:50%;filter:blur(22px);
+    background:radial-gradient(closest-side,color-mix(in oklab,var(--sp) 70%,transparent),transparent);transition:background .6s}
+  .ghero-img{width:100px;height:100px;border-radius:26px;display:block;position:relative;z-index:1}
+  .ghero-tint{position:absolute;width:100px;height:100px;border-radius:26px;mix-blend-mode:color;background:var(--sp);opacity:.9;z-index:2;transition:background .6s}
+  .ghero-label{font-size:clamp(26px,5vw,40px);font-weight:800;letter-spacing:-.03em;color:var(--sp);line-height:1;transition:color .6s}
+  .ghero-mean{color:var(--muted-fg);font-family:var(--mono);font-size:13px;margin-top:8px}
+  .grade-dots{display:flex;gap:8px;margin-top:12px}
+  .grade-dots i{width:9px;height:9px;border-radius:50%;background:var(--border);transition:.3s}
+  .grade-dots i.on{background:var(--sp);box-shadow:0 0 0 4px color-mix(in oklab,var(--sp) 22%,transparent)}
+</style>
+</head>
+<body>
+<div class="bgfx"><div class="herobg"></div><div class="blob a"></div><div class="blob b"></div></div>
+
+<nav>
+  <div class="nav-in">
+    <a class="brand" href="/"><span class="mk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 19 4M15 8l3 3M18 5l3 3"/></svg></span> Keybox Repo</a>
+    <div class="navlinks">
+      <a href="#repository">Repository</a>
+      <a href="#projects">Module</a>
+      <a href="#statuses">Statuses</a>
+      <a href="#guide">Install guide</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <span class="nav-sp"></span>
+    <a class="iconbtn" href="https://t.me/keyboxstrong" target="_blank" rel="noopener" aria-label="Telegram" title="Telegram">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.9 4.3l-3.3 15.6c-.25 1.1-.9 1.37-1.83.85l-5.05-3.72-2.44 2.35c-.27.27-.5.5-1 .5l.36-5.14L17.4 6.4c.4-.36-.09-.56-.62-.2L6.15 13.1 1.2 11.55c-1.08-.34-1.1-1.08.23-1.6L20.5 2.5c.9-.33 1.68.2 1.4 1.8z"/></svg></a>
+    <a class="iconbtn" href="https://github.com/evoker0" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.1-1.47-1.1-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg></a>
+    <button class="iconbtn" id="theme" aria-label="Toggle theme" title="Toggle theme"></button>
+  </div>
+</nav>
+
+<div class="wrap">
+  <!-- ===== HERO ===== -->
+  <header class="hero">
+    <span class="pill"><span class="live"></span> Live-verified against Google’s revocation list</span>
+    <h1>The community<br><span class="grad">keybox repository</span></h1>
+    <p class="lede">A continuously updated collection of Android attestation keyboxes. Every entry is checked in real time — <b>valid keys first</b>, revoked ones archived below, all free to download.</p>
+    <div class="cta">
+      <a class="btn primary" href="#repository" id="cta-latest">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+        Browse keyboxes</a>
+      <a class="btn tg" href="https://t.me/keyboxstrong" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.9 4.3l-3.3 15.6c-.25 1.1-.9 1.37-1.83.85l-5.05-3.72-2.44 2.35c-.27.27-.5.5-1 .5l.36-5.14L17.4 6.4c.4-.36-.09-.56-.62-.2L6.15 13.1 1.2 11.55c-1.08-.34-1.1-1.08.23-1.6L20.5 2.5c.9-.33 1.68.2 1.4 1.8z"/></svg>
+        Join the channel</a>
+    </div>
+
+    <div class="stats" id="stats">
+      <div class="stat pri"><b id="s-total">—</b><span>keyboxes tracked</span></div>
+      <div class="stat ok"><b id="s-valid">—</b><span>currently usable</span></div>
+      <div class="stat bad"><b id="s-revoked">—</b><span>revoked by Google</span></div>
+      <div class="stat"><b id="s-updated" style="font-size:18px">—</b><span>last update</span></div>
+    </div>
+  </header>
+
+  <div class="ad" id="ad-top">ad slot — paste your Adsterra / Monetag code here</div>
+
+  <!-- ===== REPOSITORY ===== -->
+  <section class="blk reveal" id="repository">
+    <div class="eyebrow">Repository</div>
+    <h2>Available keyboxes</h2>
+    <p class="sub">Sorted best-first by attestation grade, then newest. Revoked keys are kept at the bottom for reference and testing.</p>
+    <div class="toolbar">
+      <span class="verified" id="verify-note">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        checking Google revocation list…</span>
+    </div>
+    <div id="list"><div class="spin"></div></div>
+  </section>
+
+  <!-- ===== MODULE / PROMO (AlwaysStrong) ===== -->
+  <section class="blk reveal" id="projects">
+    <div class="eyebrow">Stop updating by hand</div>
+    <h2>Tired of replacing keyboxes manually?</h2>
+    <p class="sub">Every time a key gets revoked you shouldn’t have to hunt for a new one and copy it over yourself. <b>AlwaysStrong</b> is a drop-in Magisk / KernelSU module that pulls the newest strong keybox from this repository onto your device — automatically. Set it once, stay strong.</p>
+    <div id="repos"><div class="spin"></div></div>
+  </section>
+
+  <!-- ===== STATUSES (with compact color-cycling emblem, no scroll effect) ===== -->
+  <section class="blk reveal" id="statuses">
+    <div class="eyebrow">Grading</div>
+    <h2>What the statuses mean</h2>
+    <div class="grade-hero">
+      <div class="ghero-stage">
+        <div class="ghero-glow"></div>
+        <img class="ghero-img" src="/assets/emblem.webp" alt="attestation grade emblem">
+        <div class="ghero-tint"></div>
+      </div>
+      <div class="ghero-info">
+        <div class="ghero-label" id="glabel">Strong</div>
+        <div class="ghero-mean" id="gmean">Hardware-backed attestation — the strongest verdict</div>
+        <div class="grade-dots" id="gdots"><i class="on"></i><i></i><i></i><i></i></div>
+      </div>
+    </div>
+    <p class="sub">The dots on each channel post encode the attestation result. Google’s revocation list can override any grade to “Revoked”.</p>
+    <div class="grid2">
+      <div class="scard"><div class="dots"><span class="dot dg"></span><span class="dot dg"></span><span class="dot dg"></span></div><div><h3>Strong <span class="badge b-strong">Strong</span></h3><p>Three green — passes <b>hardware-backed</b> (STRONG) attestation. Banking apps, Google Wallet and Play Integrity’s strongest verdict all work.</p></div></div>
+      <div class="scard"><div class="dots"><span class="dot dg"></span><span class="dot dg"></span><span class="dot do"></span></div><div><h3>Soft-banned <span class="badge b-soft">Soft-banned</span></h3><p>Two green — still functional but flagged on some services. Good as a fallback when no strong key is available.</p></div></div>
+      <div class="scard"><div class="dots"><span class="dot dg"></span><span class="dot do"></span><span class="dot do"></span></div><div><h3>Basic integrity <span class="badge b-basic">Basic</span></h3><p>One green — only passes BASIC integrity. Enough for light root hiding, not for strong-attestation apps.</p></div></div>
+      <div class="scard"><div class="dots"><span class="dot dr"></span><span class="dot dr"></span><span class="dot dr"></span></div><div><h3>Revoked <span class="badge b-revoked">Revoked</span></h3><p>Listed by Google as compromised. It will fail attestation regardless of its certificate expiry — kept here only for reference.</p></div></div>
+    </div>
+  </section>
+
+  <div class="ad" id="ad-mid">ad slot — paste your ad code here</div>
+
+  <!-- ===== GUIDE ===== -->
+  <section class="blk reveal" id="guide">
+    <div class="eyebrow">Install guide</div>
+    <h2>Using a keybox with TrickyStore</h2>
+    <p class="sub">You’ll need a rooted device (Magisk / KernelSU / APatch) with the TrickyStore module installed.</p>
+    <div class="steps">
+      <div class="step"><div class="num">1</div><div><h3>Download a valid keybox</h3><p>Pick the top entry marked <span class="badge b-strong">Strong</span> above and tap <b>Download</b>. You’ll get a <code class="inline">keybox.xml</code> file.</p></div></div>
+      <div class="step"><div class="num">2</div><div><h3>Place it in the TrickyStore folder</h3><p>Copy the file to the path below (any root file manager works):</p><pre class="code"><span class="c"># replace the existing keybox</span>
+/data/adb/tricky_store/keybox.xml</pre></div></div>
+      <div class="step"><div class="num">3</div><div><h3>Enable “valid keybox” mode</h3><p>Make sure TrickyStore is set to use a custom keybox. Some builds auto-detect it; others need <code class="inline">security patch</code> spoofing enabled in the config.</p></div></div>
+      <div class="step"><div class="num">4</div><div><h3>Reboot &amp; verify</h3><p>Reboot, then check with an attestation tester (e.g. Play Integrity API Checker). A strong key returns <b>STRONG / DEVICE + STRONG</b>. If it fails, the key may have just been revoked — grab a newer one.</p></div></div>
+    </div>
+  </section>
+
+  <!-- ===== FAQ ===== -->
+  <section class="blk reveal" id="faq">
+    <div class="eyebrow">FAQ</div>
+    <h2>Frequently asked</h2>
+    <div class="faq">
+      <details open><summary>Why did a “Strong” keybox stop working?<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></summary><div class="ans">Google periodically revokes leaked keyboxes. A key that graded Strong yesterday can be added to the revocation list at any time — this page re-checks on every visit and moves revoked keys to the archive automatically. When that happens, just download the newest valid one.</div></details>
+      <details><summary>Is “valid” the same as “not expired”?<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></summary><div class="ans">No — and this is the most common mistake. A keybox’s certificates can be valid for years yet already be revoked by Google for key compromise. Validity here means <b>not on Google’s revocation list</b> plus the attestation grade from testing, not the certificate expiry date.</div></details>
+      <details><summary>How often is the repository updated?<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></summary><div class="ans">Whenever a new keybox is posted to the <a href="https://t.me/keyboxstrong" target="_blank" rel="noopener">Telegram channel</a>, it appears here within about a minute. Revocation status, however, is evaluated <b>live</b> every time you load the page.</div></details>
+      <details><summary>Is this safe / where do the keyboxes come from?<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></summary><div class="ans">Keyboxes are community-sourced and shared for research and root-hiding on your own devices. The files are provided as-is; verify anything important yourself. This project only mirrors and grades them — it doesn’t generate keys.</div></details>
+      <details><summary>What is a keybox, exactly?<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></summary><div class="ans">It’s an XML file holding a device attestation key and its certificate chain. TrickyStore uses it to answer hardware-attestation challenges so Play Integrity and similar checks pass on a rooted device.</div></details>
+    </div>
+  </section>
+
+  <div class="ad" id="ad-bottom">ad slot — paste your ad code here</div>
+</div>
+
+<!-- ===== FOOTER ===== -->
+<footer>
+  <div class="foot">
+    <div class="about">
+      <a class="brand" href="/"><span class="mk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 19 4M15 8l3 3M18 5l3 3"/></svg></span> Keybox Repo</a>
+      <p>An automated, live-verified mirror of community Android attestation keyboxes. Maintained by <b>@evokerr</b>.</p>
+    </div>
+    <div>
+      <h4>Project</h4>
+      <a href="https://github.com/evoker0/AlwaysStrong" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>AlwaysStrong module</a>
+      <a href="https://t.me/keyboxstrong" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.9 4.3l-3.3 15.6c-.25 1.1-.9 1.37-1.83.85l-5.05-3.72-2.44 2.35c-.27.27-.5.5-1 .5l.36-5.14L17.4 6.4c.4-.36-.09-.56-.62-.2L6.15 13.1 1.2 11.55c-1.08-.34-1.1-1.08.23-1.6L20.5 2.5c.9-.33 1.68.2 1.4 1.8z"/></svg>Telegram channel</a>
+      <a href="https://github.com/evoker0" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.1-1.47-1.1-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg>GitHub</a>
+      <a href="#repository">Browse keyboxes</a>
+    </div>
+    <div>
+      <h4>Resources</h4>
+      <a href="#guide">Install guide</a>
+      <a href="#statuses">Status meanings</a>
+      <a href="#faq">FAQ</a>
+      <a href="https://android.googleapis.com/attestation/status" target="_blank" rel="noopener">Google revocation list</a>
+    </div>
+    <div>
+      <h4>Related</h4>
+      <a href="https://github.com/5ec1cff/TrickyStore" target="_blank" rel="noopener">TrickyStore</a>
+      <a href="https://github.com/KOWX712/Tricky-Addon-Update-Target-List" target="_blank" rel="noopener">Tricky Addon</a>
+      <a href="https://github.com/chiteroman/PlayIntegrityFix" target="_blank" rel="noopener">PlayIntegrityFix</a>
+    </div>
+  </div>
+  <div class="foot-b"><div class="in">
+    <span>© <span id="year">2026</span> evoker · community mirror, provided as-is.</span>
+    <span>Status verified live via Google’s attestation revocation list.</span>
+  </div></div>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+document.getElementById('year').textContent = new Date().getFullYear();
+const SUN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+const MOON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+function paintTheme(){ $("#theme").innerHTML = document.documentElement.classList.contains('dark') ? SUN : MOON; }
+paintTheme();
+$("#theme").addEventListener('click', ()=>{ const d=document.documentElement.classList.toggle('dark');
+  localStorage.setItem('theme', d?'dark':'light'); paintTheme(); });
+
+function toast(m){const t=$("#toast");t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1500);}
+function fmtBytes(n){return n==null?'—':(n<1024?n+' B':(n/1024).toFixed(1)+' KB');}
+function fmtDate(iso){try{return new Date(iso).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'});}catch(e){return '—';}}
+function relDate(iso){try{const d=(Date.now()-new Date(iso))/86400000;
+  if(d<1)return'today';if(d<2)return'yesterday';if(d<30)return Math.floor(d)+'d ago';
+  if(d<365)return Math.floor(d/30)+'mo ago';return Math.floor(d/365)+'y ago';}catch(e){return'—';}}
+
+const ICO={
+  dl:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>',
+  cp:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  shield:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>',
+  warn:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>',
+  ban:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>',
+};
+const GRADES={
+  strong:  {label:'Strong',          cls:'g-strong',  badge:'b-strong', ic:ICO.shield, rank:0},
+  valid:   {label:'Valid',           cls:'g-valid',   badge:'b-valid',  ic:ICO.shield, rank:1},
+  soft:    {label:'Soft-banned',     cls:'g-soft',    badge:'b-soft',   ic:ICO.warn,   rank:2},
+  basic:   {label:'Basic integrity', cls:'g-basic',   badge:'b-basic',  ic:ICO.warn,   rank:3},
+  unknown: {label:'Unverified',      cls:'',          badge:'b-unknown',ic:ICO.warn,   rank:4},
+  revoked: {label:'Revoked',         cls:'g-revoked', badge:'b-revoked',ic:ICO.ban,    rank:9},
+};
+function classify(e, revoked){
+  const isRevoked = (e.red|0) > 0 || (revoked && (e.serials||[]).some(s=>revoked.has(String(s).toLowerCase())));
+  if(isRevoked) return 'revoked';
+  const g = e.green|0;
+  if(g>=3) return 'strong'; if(g===2) return 'soft'; if(g===1) return 'basic';
+  return revoked ? 'valid' : 'unknown';
+}
+function kcard(e, grade, isNewest){
+  const G=GRADES[grade];
+  const el=document.createElement('div');
+  el.className='kcard '+G.cls+(grade==='revoked'?' dim':'');
+  const fname=(e.filename||'keybox.xml').replace(/[<>&"]/g,'');
+  const dlHref = e.xml!=null ? 'data:application/xml;charset=utf-8,'+encodeURIComponent(e.xml) : '/'+e.file;
+  el.innerHTML=`
+    <div class="kicon">${G.ic}</div>
+    <div class="kmain">
+      <div class="kname">
+        <span class="fn">${fname}</span>
+        <span class="badge ${G.badge}">${G.label}</span>
+        ${isNewest&&grade!=='revoked'?'<span class="badge b-new">Latest</span>':''}
+        ${e.isLive?'<span class="badge b-live">Current</span>':''}
+      </div>
+      <div class="kmeta">
+        <span>${fmtDate(e.updated_at)} · ${relDate(e.updated_at)}</span>
+        <span>${fmtBytes(e.xml_bytes)}</span>
+        <span>${(e.serials||[]).length} certs</span>
+      </div>
+    </div>
+    <div class="kact">
+      <a class="sbtn primary" href="${dlHref}" download="${fname}">${ICO.dl}Download</a>
+      <button class="sbtn" data-copy="1">${ICO.cp}Copy</button>
+    </div>`;
+  el.querySelector('[data-copy]').addEventListener('click', async ()=>{
+    try{
+      const xml = e.xml!=null ? e.xml : await (await fetch('/'+e.file)).text();
+      await navigator.clipboard.writeText(xml); toast('Copied to clipboard');
+    }catch(err){ toast('Copy failed'); }
+  });
+  return el;
+}
+
+// ---- decode /key + read cert serials client-side, so the CURRENT keybox
+//      shows in the list even before the bot writes it into the archive ----
+function b64bytes(b64){
+  const bin=atob(String(b64).replace(/[^A-Za-z0-9+/=]/g,''));
+  const u=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
+  return u;
+}
+function derLen(u,i){ let b=u[i++]; if(b<0x80) return [b,i];
+  let n=b&0x7f,len=0; while(n--) len=(len*256)+u[i++]; return [len,i]; }
+function certSerial(der){
+  try{ let i=0,l;
+    if(der[i++]!==0x30) return null; [l,i]=derLen(der,i);            // Certificate
+    if(der[i++]!==0x30) return null; [l,i]=derLen(der,i);            // tbsCertificate
+    if(der[i]===0xA0){ i++; let vl; [vl,i]=derLen(der,i); i+=vl; }   // [0] version
+    if(der[i++]!==0x02) return null; let sl; [sl,i]=derLen(der,i);   // serialNumber
+    let hex=''; for(let k=0;k<sl;k++) hex+=der[i+k].toString(16).padStart(2,'0');
+    return (hex.replace(/^0+/,'')||'0').toLowerCase();
+  }catch(e){ return null; }
+}
+function extractSerials(xml){
+  const clean=String(xml).replace(/<!--[\s\S]*?-->/g,'');   // strip watermark comments
+  const re=/-----BEGIN CERTIFICATE-----([\s\S]*?)-----END CERTIFICATE-----/g;
+  const out=[]; let m;
+  while((m=re.exec(clean))){ const s=certSerial(b64bytes(m[1])); if(s) out.push(s); }
+  return out;
+}
+async function liveKeybox(){
+  try{
+    const bust='?_='+Date.now();
+    const [b64,meta,st]=await Promise.all([
+      fetch('/key'+bust).then(r=>r.ok?r.text():''),
+      fetch('/meta.json'+bust).then(r=>r.ok?r.json():({})).catch(()=>({})),
+      fetch('/status'+bust).then(r=>r.ok?r.text():'').catch(()=>'')
+    ]);
+    if(!b64) return null;
+    const xml=new TextDecoder().decode(b64bytes(b64));
+    return {
+      filename: meta.filename||'keybox.xml',
+      xml, isLive:true,
+      xml_bytes: meta.xml_bytes!=null?meta.xml_bytes:xml.length,
+      updated_at: meta.updated_at||new Date().toISOString(),
+      sha256_xml: meta.sha256_xml,
+      serials: extractSerials(xml),
+      green:(st.match(/🟢/g)||[]).length,
+      red:(st.match(/🔴/g)||[]).length,
+    };
+  }catch(e){ return null; }
+}
+
+async function loadRepo(){
+  let items=[];
+  try{ items=await(await fetch('/keys.json?_='+Date.now())).json(); }catch(e){ items=[]; }
+  if(!Array.isArray(items)) items=[];
+
+  // the keybox currently served at /key, injected live at the top
+  const live=await liveKeybox();
+  if(live){
+    if(live.sha256_xml) items=items.filter(e=>e.sha256_xml!==live.sha256_xml);
+    items.unshift(live);
+  }
+  if(!items.length){ $("#list").innerHTML='<div class="empty">No keyboxes published yet.</div>'; return; }
+
+  let revoked=null;
+  try{ const d=await(await fetch('/attestation-status')).json();
+    revoked=new Set(Object.keys(d.entries||{}).map(s=>s.toLowerCase()));
+    $("#verify-note").innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> verified against '+revoked.size.toLocaleString()+' revoked serials';
+  }catch(e){ revoked=null; $("#verify-note").textContent='revocation list unavailable, showing channel grades only'; }
+
+  const t=x=>new Date(x||0).getTime();
+  const rows=items.map(e=>{const g=classify(e,revoked);return{e,g,G:GRADES[g],t:t(e.updated_at)};});
+  const newestT=Math.max(...rows.map(r=>r.t));
+  rows.sort((a,b)=>a.G.rank-b.G.rank||b.t-a.t);
+
+  const revokedN=rows.filter(r=>r.g==='revoked').length;
+  $("#s-total").textContent=rows.length;
+  $("#s-valid").textContent=rows.length-revokedN;
+  $("#s-revoked").textContent=revokedN;
+  $("#s-updated").textContent=relDate(new Date(newestT).toISOString());
+
+  const list=$("#list");list.innerHTML='';let shown=false;
+  rows.forEach(r=>{
+    if(r.g==='revoked'&&!shown){const h=document.createElement('div');h.className='sec-label';h.textContent='Revoked archive';list.appendChild(h);shown=true;}
+    list.appendChild(kcard(r.e,r.g,r.t===newestT));
+  });
+}
+loadRepo();
+
+// ---- featured GitHub project (AlwaysStrong, live star count) ----
+const GH_ICON='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.1-1.47-1.1-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg>';
+const STAR='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>';
+function esc(s){return (s||'').replace(/[<>&]/g,'');}
+function repoCard(r){
+  const topics=(r.topics||[]).slice(0,6).map(t=>`<span class="repo-tag">${esc(t)}</span>`).join('');
+  return `<a class="repo-feat" href="${r.html_url}" target="_blank" rel="noopener">
+    <div class="repo-top"><span class="repo-ic">${GH_ICON}</span>
+      <div><div class="repo-name">${esc(r.full_name)}</div>
+      <div class="repo-sub">${esc(r.language||'Shell')} · Magisk / KernelSU module</div></div>
+      <span class="repo-star">${STAR}${(r.stargazers_count||0).toLocaleString()}</span></div>
+    <p class="repo-desc">${esc(r.description)}</p>
+    ${topics?`<div class="repo-tags">${topics}</div>`:''}
+    <span class="repo-open">View on GitHub →</span></a>`;
+}
+async function loadProject(){
+  const box=document.getElementById('repos'); if(!box) return;
+  const fallback={full_name:'evoker0/AlwaysStrong',html_url:'https://github.com/evoker0/AlwaysStrong',
+    description:'Always Strong: Strong Play Integrity in one drop-in module. TEESimulator-RS + PlayIntegrityFork bundled.',
+    stargazers_count:121,language:'Shell',topics:['android','attestation','kernelsu','magisk','trusted-execution-environment']};
+  let r=fallback;
+  try{ const res=await fetch('https://api.github.com/repos/evoker0/AlwaysStrong');
+    if(res.ok){ const d=await res.json(); r={...fallback,...d}; } }catch(e){}
+  box.innerHTML=repoCard(r);
+}
+loadProject();
+
+// scroll reveal (fallback / always-on)
+const io=new IntersectionObserver((es)=>{es.forEach(x=>{if(x.isIntersecting){x.target.classList.add('in');io.unobserve(x.target);}});},{threshold:.08});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+
+<!-- interaction: lightweight, native scroll, no external libraries -->
+<script>
+(function(){
+  const reduce = matchMedia('(prefers-reduced-motion:reduce)').matches;
+  const canHover = matchMedia('(hover:hover)').matches;
+  const isDark = () => document.documentElement.classList.contains('dark');
+
+  /* ---- 3D tilt on cards (desktop pointer only, GPU transform) ---- */
+  if(!reduce && canHover){
+    document.querySelectorAll('.scard,.fcard').forEach(c=>{
+      c.addEventListener('mousemove',e=>{const r=c.getBoundingClientRect();
+        const x=(e.clientX-r.left)/r.width-.5, y=(e.clientY-r.top)/r.height-.5;
+        c.style.transform=`perspective(720px) rotateX(${-y*6}deg) rotateY(${x*6}deg) translateY(-2px)`;});
+      c.addEventListener('mouseleave',()=>c.style.transform='');
+    });
+  }
+
+  /* ---- grade emblem: color cycle on a timer (never touches scroll) ---- */
+  const grades=[
+    {n:'Strong',          m:'Hardware-backed attestation — the strongest verdict', c:'#22c55e'},
+    {n:'Soft-banned',     m:'Still functional, but flagged on some services',      c:'#f59e0b'},
+    {n:'Basic integrity', m:'Passes BASIC integrity only — light root hiding',     c:'#eab308'},
+    {n:'Revoked',         m:'Listed by Google as compromised — fails attestation', c:'#ef4444'},
+  ];
+  const gl=document.getElementById('glabel'), gm=document.getElementById('gmean'),
+        gd=document.querySelectorAll('#gdots i');
+  if(gl){
+    let gi=0;
+    const setGrade=k=>{document.documentElement.style.setProperty('--sp',grades[k].c);
+      gl.textContent=grades[k].n; gm.textContent=grades[k].m;
+      gd.forEach((d,j)=>d.classList.toggle('on',j===k));};
+    setGrade(0);
+    if(!reduce) setInterval(()=>{gi=(gi+1)%4; setGrade(gi);}, 2600);
+  }
+})();
+</script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"d23e96a30f9449beb877926092e9aa18","r":1}' crossorigin="anonymous"></script>
+</body>
+</html>

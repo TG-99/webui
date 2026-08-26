@@ -1,0 +1,21 @@
+[
+  {
+    "sha256_xml": "7f61581c4c2a797ff43f9e60e2ff50c95a4c33c283e9ddd8756019ba26ce04dd",
+    "file": "keys/7f61581c4c2a797f.xml",
+    "filename": "evokerrkey21 (2).xml",
+    "xml_bytes": 16307,
+    "updated_at": "2026-05-26T15:41:12.079193+00:00",
+    "serials": [
+      "8616ef30679ed43cc2b43e3c97a2319e",
+      "fccccf13df90019596467184253166cf",
+      "d50ff25ba3f2d6b3",
+      "b2bf55a510cee1006657d614f1938a52",
+      "b824404eb11845e96d78396916aa114b",
+      "d50ff25ba3f2d6b3"
+    ],
+    "green": 0,
+    "red": 0,
+    "source": "https://t.me/keyboxstrong/177",
+    "message_id": 177
+  }
+]

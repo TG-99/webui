@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="evoker · freelance Android developer & open source contributor in the Android root community. Modules, root & Play Integrity work, and my channels." />
+<title>evoker</title>
+<link rel="icon" type="image/jpeg" href="/assets/avatar.jpg" />
+<link rel="apple-touch-icon" href="/assets/avatar.jpg" />
+<meta property="og:title" content="evoker" />
+<meta property="og:description" content="Freelance Android developer & open source contributor in the Android root community." />
+<meta property="og:image" content="/assets/avatar.jpg" />
+<meta name="theme-color" content="#f1f4fa" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#02030a" media="(prefers-color-scheme: dark)" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script>
+  (function () {
+    var t = localStorage.getItem('theme');
+    if (t === 'dark' || (t !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches))
+      document.documentElement.classList.add('dark');
+  })();
+</script>
+<style>
+  :root{
+    --bg:#f1f4fa; --fg:#0b1020; --fg-muted:#0b1020a6; --fg-subtle:#0b102080;
+    --panel:#ffffff; --panel-2:#f7f9fd; --border:#0b10201f; --border-strong:#0b10202e;
+    --accent:#0891b2; --accent2:#6366f1; --on-accent:#fff;
+    --sans:'Inter',ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --shadow:0 1px 2px #0b102014,0 20px 50px -24px #0b102033;
+    --ease:cubic-bezier(.16,1,.3,1);
+  }
+  html.dark{
+    --bg:#02030a; --fg:#f8fbff; --fg-muted:#f8fbffa6; --fg-subtle:#f8fbff73;
+    --panel:#0e1119; --panel-2:#12151f; --border:#ffffff1a; --border-strong:#ffffff2e;
+    --accent:#67e8f9; --accent2:#818cf8; --on-accent:#02030a;
+    --shadow:0 1px 2px #0000006e,0 30px 70px -30px #000000e6;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;min-height:100dvh;background:var(--bg);color:var(--fg);font-family:var(--sans);
+    font-size:15.5px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden;position:relative}
+  a{color:inherit;text-decoration:none}
+  .tnum{font-family:var(--mono);font-feature-settings:"tnum" 1;font-variant-numeric:tabular-nums}
+
+  /* ---- ambient aurora background (static, cheap) ---- */
+  .aurora{position:fixed;inset:0;z-index:-2;overflow:hidden;pointer-events:none}
+  .aurora i{position:absolute;border-radius:50%;filter:blur(28px);opacity:.4;transform:translateZ(0)}
+  .aurora .a1{width:56vw;height:56vw;top:-22vw;left:-10vw;background:radial-gradient(closest-side,color-mix(in oklab,var(--accent) 50%,transparent),transparent)}
+  .aurora .a2{width:48vw;height:48vw;top:-10vw;right:-14vw;background:radial-gradient(closest-side,color-mix(in oklab,var(--accent2) 50%,transparent),transparent)}
+  .aurora .a3{width:42vw;height:42vw;bottom:-18vw;left:32vw;background:radial-gradient(closest-side,color-mix(in oklab,var(--accent) 36%,transparent),transparent);opacity:.26}
+  html.dark .aurora i{opacity:.24}
+  .grain{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.55;
+    background:radial-gradient(circle at 50% 0,transparent,var(--bg) 80%)}
+
+  /* premium glass polish */
+  html.dark .ch,html.dark .proj,html.dark .donate,html.dark .soc,html.dark .theme,
+  html.dark .stat,html.dark .feat,html.dark .svc{box-shadow:var(--shadow),inset 0 1px 0 #ffffff12}
+  .ch:hover,.proj:hover,.donate:hover{box-shadow:var(--shadow),0 16px 36px -18px color-mix(in oklab,var(--accent) 50%,transparent)}
+  html.dark h1{filter:drop-shadow(0 3px 22px color-mix(in oklab,var(--accent) 26%,transparent))}
+
+  /* micro-interactions */
+  .ch,.proj,.donate,.soc,.theme,.stat,.feat-cta{transition:transform .24s var(--ease),box-shadow .2s,border-color .2s,background .2s}
+  .ch:active,.proj:active,.donate:active,.soc:active,.theme:active,.feat-cta:active{transform:scale(.985)}
+  .av-wrap{transition:transform .2s var(--ease)}
+
+  /* available-for-work pill */
+  .statuspill{display:inline-flex;align-items:center;gap:8px;margin-top:13px;font-size:12.5px;font-weight:600;
+    color:var(--fg-muted);border:1px solid var(--border);background:var(--panel);padding:5px 13px;border-radius:999px}
+  .statuspill .d{width:7px;height:7px;border-radius:50%;background:#22c55e;animation:pulse 2.2s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 #22c55e80}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+
+  /* ---- theme toggle ---- */
+  .theme{position:fixed;top:18px;right:18px;z-index:10;width:38px;height:38px;border-radius:11px;
+    border:1px solid var(--border);background:var(--panel);color:var(--fg);cursor:pointer;
+    display:grid;place-items:center;transition:.15s}
+  .theme:hover{border-color:var(--accent)} .theme svg{width:18px;height:18px}
+
+  main{max-width:640px;margin:0 auto;padding:76px 22px 60px;position:relative;z-index:1}
+
+  /* ---- hero ---- */
+  .hero{display:flex;align-items:center;gap:26px}
+  .av-wrap{position:relative;width:114px;height:114px;flex:none}
+  /* elegant static gradient ring + soft glow (no continuous animation) */
+  .av-ring{position:absolute;inset:-4px;border-radius:30px;padding:4px;opacity:.95;
+    background:linear-gradient(140deg,var(--accent),var(--accent2) 55%,color-mix(in oklab,var(--accent2) 20%,transparent) 92%);
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+  .av-wrap::after{content:"";position:absolute;inset:-16px;border-radius:36px;z-index:-1;pointer-events:none;
+    background:radial-gradient(closest-side,color-mix(in oklab,var(--accent) 42%,transparent),transparent);opacity:.55}
+  .av{position:absolute;inset:0;border-radius:26px;overflow:hidden;box-shadow:var(--shadow)}
+  .av img{width:100%;height:100%;object-fit:cover;display:block}
+  .av-dot{position:absolute;right:5px;bottom:5px;width:18px;height:18px;border-radius:50%;
+    background:#22c55e;border:3px solid var(--bg);z-index:2}
+  .hero-text{flex:1;min-width:0}
+  h1{margin:0;font-size:clamp(42px,12vw,74px);font-weight:900;letter-spacing:-.04em;line-height:.98;
+    transform-origin:left center;
+    background:linear-gradient(100deg,var(--fg),var(--accent) 68%,var(--accent2));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  /* big on open, scales down smoothly as you scroll; runs on the compositor
+     via the native scroll timeline, so there is no scroll listener and no jank */
+  @supports (animation-timeline: scroll()){
+    @media (prefers-reduced-motion:no-preference){
+      h1{will-change:transform;animation:heroShrink linear both;
+        animation-timeline:scroll(root);animation-range:0 44vh}
+      @keyframes heroShrink{from{transform:none}to{transform:scale(.66)}}
+    }
+  }
+  .handle{margin-top:6px;color:var(--accent);font-weight:600;font-size:14.5px;font-family:var(--mono)}
+  .tag{margin:13px 0 0;color:var(--fg-muted);font-size:15.5px}
+  .socials{display:flex;gap:10px;margin-top:18px}
+  .soc{width:42px;height:42px;border-radius:12px;border:1px solid var(--border);background:var(--panel);
+    display:grid;place-items:center;transition:.16s}
+  .soc:hover{transform:translateY(-3px);border-color:var(--accent);color:var(--accent)}
+  .soc svg{width:19px;height:19px}
+  @media (max-width:520px){.hero{flex-direction:column;align-items:flex-start;gap:18px}.av-wrap{width:92px;height:92px}}
+
+  /* ---- live stat row ---- */
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-top:26px}
+  .stat{padding:15px 16px;border-radius:15px;border:1px solid var(--border);
+    background:linear-gradient(160deg,var(--panel),var(--panel-2));box-shadow:var(--shadow)}
+  .stat-n{font-size:24px;font-weight:800;letter-spacing:-.02em;line-height:1;display:flex;align-items:center;gap:6px}
+  .stat-n svg{width:16px;height:16px;color:var(--accent);flex:none}
+  .stat-l{margin-top:6px;color:var(--fg-subtle);font-size:11.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase}
+
+  /* ---- section label ---- */
+  .label{margin:46px 2px 15px;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--fg-subtle);display:flex;align-items:center;gap:10px}
+  .label::after{content:"";flex:1;height:1px;background:var(--border)}
+
+  /* ---- featured spotlight (AlwaysStrong) ---- */
+  .feat{position:relative;border-radius:20px;padding:22px;overflow:hidden;
+    border:1px solid color-mix(in oklab,var(--accent) 34%,var(--border));
+    background:linear-gradient(150deg,color-mix(in oklab,var(--accent) 11%,var(--panel)),var(--panel) 62%);
+    box-shadow:var(--shadow)}
+  .feat::before{content:"";position:absolute;width:210px;height:210px;top:-90px;right:-70px;border-radius:50%;
+    background:radial-gradient(closest-side,color-mix(in oklab,var(--accent) 40%,transparent),transparent);opacity:.7;pointer-events:none}
+  .feat-head{display:flex;align-items:center;gap:14px;position:relative}
+  .feat-ic{width:52px;height:52px;border-radius:15px;flex:none;display:grid;place-items:center;
+    background:linear-gradient(140deg,var(--accent),var(--accent2));color:var(--on-accent);
+    box-shadow:0 10px 26px -10px color-mix(in oklab,var(--accent) 80%,transparent)}
+  .feat-ic svg{width:27px;height:27px}
+  .feat-title{font-size:19px;font-weight:800;letter-spacing:-.01em}
+  .feat-sub{margin-top:2px;color:var(--fg-subtle);font-size:12.5px;font-family:var(--mono);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#f7b955;
+    background:color-mix(in oklab,#f7b955 15%,transparent);padding:3px 8px;border-radius:999px}
+  .badge svg{width:12px;height:12px}
+  .pill-live{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;letter-spacing:.05em;
+    color:var(--accent);background:color-mix(in oklab,var(--accent) 14%,transparent);padding:3px 9px;border-radius:999px}
+  .pill-live .d{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 2.2s infinite}
+  .feat-desc{margin:16px 0 0;color:var(--fg-muted);font-size:14.5px;line-height:1.62;position:relative}
+  .feat-desc b{color:var(--fg);font-weight:600}
+  .feat-tags{display:flex;gap:7px;flex-wrap:wrap;margin-top:14px;position:relative}
+  .feat-tag{font-size:11px;font-weight:600;color:var(--accent);background:color-mix(in oklab,var(--accent) 12%,transparent);padding:4px 10px;border-radius:999px}
+  .feat-actions{display:flex;gap:10px;margin-top:18px;position:relative;flex-wrap:wrap}
+  .feat-cta{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;padding:10px 16px;border-radius:12px}
+  .feat-cta.primary{background:var(--fg);color:var(--bg)}
+  .feat-cta.primary:hover{transform:translateY(-2px);box-shadow:0 12px 26px -12px color-mix(in oklab,var(--accent) 70%,transparent)}
+  .feat-cta.ghost{background:var(--panel);border:1px solid var(--border);color:var(--fg)}
+  .feat-cta.ghost:hover{transform:translateY(-2px);border-color:var(--accent);color:var(--accent)}
+  .feat-cta svg{width:16px;height:16px}
+
+  /* ---- channels ---- */
+  .ch{display:flex;align-items:center;gap:15px;padding:16px 18px;margin-bottom:11px;border-radius:16px;
+    border:1px solid var(--border);background:var(--panel);box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .ch::before{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent,color-mix(in oklab,var(--accent) 12%,transparent));opacity:0;transition:.18s}
+  .ch:hover{transform:translateY(-2px);border-color:color-mix(in oklab,var(--accent) 55%,var(--border))}
+  .ch:hover::before{opacity:1}
+  .ch-ic{width:46px;height:46px;border-radius:13px;flex:none;display:grid;place-items:center;position:relative;
+    background:linear-gradient(140deg,#2aabee,#229ED9);color:#fff;box-shadow:0 8px 18px -8px #229ed9aa}
+  .ch-ic svg{width:24px;height:24px}
+  .ch-main{flex:1;min-width:0;position:relative}
+  .ch-name{font-weight:700;font-size:15.5px;display:block}
+  .ch-user{color:var(--fg-subtle);font-size:13px;font-family:var(--mono)}
+  .ch-desc{color:var(--fg-muted);font-size:13px;margin-top:2px}
+  .ch-arrow{flex:none;color:var(--fg-subtle);transition:.18s;position:relative}
+  .ch:hover .ch-arrow{color:var(--accent);transform:translateX(3px)}
+  .ch-arrow svg{width:18px;height:18px}
+
+  /* ---- about ---- */
+  .about{margin:0;color:var(--fg-muted);font-size:15.5px;line-height:1.72}
+  .about b{color:var(--fg);font-weight:600}
+  .about a{color:var(--accent);font-weight:600}
+
+  /* ---- projects ---- */
+  .proj-grid{display:flex;flex-direction:column;gap:11px}
+  .proj{display:block;padding:18px;border-radius:16px;border:1px solid var(--border);background:var(--panel);box-shadow:var(--shadow)}
+  .proj:hover{transform:translateY(-2px);border-color:color-mix(in oklab,var(--accent) 55%,var(--border))}
+  .proj-top{display:flex;align-items:center;gap:12px}
+  .proj-ic{width:40px;height:40px;border-radius:11px;flex:none;display:grid;place-items:center;
+    background:color-mix(in oklab,var(--accent) 14%,transparent);color:var(--accent)}
+  .proj-ic svg{width:21px;height:21px}
+  .proj-name{font-weight:700;font-size:15.5px}
+  .proj-lang{color:var(--fg-subtle);font-size:12px;font-family:var(--mono);margin-top:1px;display:flex;align-items:center;gap:6px}
+  .proj-lang .dot{width:8px;height:8px;border-radius:50%;background:var(--accent2)}
+  .proj-star{margin-left:auto;flex:none;display:inline-flex;align-items:center;gap:5px;font-weight:700;color:#f7b955}
+  .proj-star svg{width:15px;height:15px}
+  .proj-desc{color:var(--fg-muted);font-size:14px;margin:12px 0 0}
+  .proj-tags{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+  .proj-tag{font-size:11px;font-weight:600;color:var(--accent);background:color-mix(in oklab,var(--accent) 12%,transparent);padding:3px 9px;border-radius:999px}
+
+  /* ---- donate ---- */
+  .donate{display:flex;align-items:center;gap:15px;padding:16px 18px;border-radius:16px;
+    border:1px solid color-mix(in oklab,var(--accent) 40%,var(--border));
+    background:linear-gradient(100deg,color-mix(in oklab,var(--accent) 10%,var(--panel)),var(--panel));box-shadow:var(--shadow)}
+  .donate:hover{transform:translateY(-2px);border-color:var(--accent)}
+  .donate-ic{width:46px;height:46px;border-radius:13px;flex:none;display:grid;place-items:center;
+    background:linear-gradient(140deg,#ffdd33,#f59e0b);color:#3a2a12;box-shadow:0 8px 18px -8px #f59e0baa}
+  .donate-ic svg{width:23px;height:23px}
+  .donate-main{flex:1;min-width:0}
+  .donate-title{font-weight:700;font-size:15.5px;display:block}
+  .donate-sub{color:var(--fg-muted);font-size:13px}
+
+  /* ---- stack chips ---- */
+  .chips{display:flex;flex-wrap:wrap;gap:9px}
+  .chip{font-size:13px;font-weight:600;color:var(--fg-muted);border:1px solid var(--border);
+    background:var(--panel);padding:8px 14px;border-radius:11px;transition:transform .18s var(--ease),color .16s,border-color .16s}
+  .chip:hover{color:var(--accent);border-color:color-mix(in oklab,var(--accent) 50%,var(--border));transform:translateY(-2px)}
+
+  /* ---- services ---- */
+  .svc-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+  @media (max-width:520px){.svc-grid{grid-template-columns:1fr}}
+  .svc{padding:18px;border-radius:16px;border:1px solid var(--border);background:var(--panel);box-shadow:var(--shadow);
+    transition:transform .2s var(--ease),border-color .18s}
+  .svc:hover{transform:translateY(-3px);border-color:color-mix(in oklab,var(--accent) 45%,var(--border))}
+  .svc-ic{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;margin-bottom:12px;
+    background:color-mix(in oklab,var(--accent) 14%,transparent);color:var(--accent)}
+  .svc-ic svg{width:20px;height:20px}
+  .svc h3{margin:0;font-size:15px;font-weight:700}
+  .svc p{margin:6px 0 0;color:var(--fg-muted);font-size:13.5px;line-height:1.55}
+
+  /* ---- reveal on scroll ---- */
+  .reveal{opacity:0;transform:translateY(22px)}
+  .reveal.show{opacity:1;transform:none;transition:opacity .6s ease,transform .7s var(--ease)}
+
+  footer{margin-top:46px;padding-top:24px;border-top:1px solid var(--border);
+    display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+    color:var(--fg-subtle);font-size:12.5px}
+  footer a{color:var(--fg-muted);font-weight:600}
+  footer a:hover{color:var(--accent)}
+  .foot-links{display:flex;gap:16px;flex-wrap:wrap}
+
+  /* ---- entrance ---- */
+  .rise{opacity:0;animation:rise .8s var(--ease) forwards}
+  @keyframes rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important;scroll-behavior:auto}
+    .rise,.reveal{opacity:1;transform:none}
+  }
+  /* perf: no backdrop-filter anywhere (costly repaints on scroll); panels are solid */
+  .ch,.proj,.donate,.soc,.theme,.statuspill,.stat,.feat,.svc,.chip{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+</style>
+</head>
+<body>
+<div class="aurora"><i class="a1"></i><i class="a2"></i><i class="a3"></i></div>
+<div class="grain"></div>
+
+<button class="theme" id="theme" aria-label="Toggle theme"></button>
+
+<main>
+  <section class="hero rise" style="animation-delay:.05s">
+    <div class="av-wrap">
+      <div class="av-ring"></div>
+      <div class="av"><img src="/assets/avatar.jpg" alt="evoker" width="114" height="114"></div>
+      <span class="av-dot" title="online"></span>
+    </div>
+    <div class="hero-text">
+      <h1>evoker</h1>
+      <div class="handle">@evokerr</div>
+      <p class="tag">Freelance Android developer &amp; open source contributor in the Android root community.</p>
+      <div class="statuspill"><span class="d"></span> Available for freelance work</div>
+      <div class="socials">
+      <a class="soc" href="https://github.com/evoker0" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.1-1.47-1.1-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg></a>
+      <a class="soc" href="https://t.me/evokerr" target="_blank" rel="noopener" aria-label="Telegram" title="Telegram">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.9 4.3l-3.3 15.6c-.25 1.1-.9 1.37-1.83.85l-5.05-3.72-2.44 2.35c-.27.27-.5.5-1 .5l.36-5.14L17.4 6.4c.4-.36-.09-.56-.62-.2L6.15 13.1 1.2 11.55c-1.08-.34-1.1-1.08.23-1.6L20.5 2.5c.9-.33 1.68.2 1.4 1.8z"/></svg></a>
+      </div>
+    </div>
+  </section>
+
+  <section class="stats rise" style="animation-delay:.18s" id="stats" aria-label="GitHub stats">
+    <div class="stat">
+      <div class="stat-n"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg><span class="tnum" id="s-stars">&middot;&middot;</span></div>
+      <div class="stat-l">Stars</div>
+    </div>
+    <div class="stat">
+      <div class="stat-n"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="8"/><rect x="12" y="6" width="3" height="12"/><rect x="17" y="13" width="3" height="5"/></svg><span class="tnum" id="s-repos">&middot;&middot;</span></div>
+      <div class="stat-l">Repos</div>
+    </div>
+    <div class="stat">
+      <div class="stat-n"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg><span class="tnum" id="s-followers">&middot;&middot;</span></div>
+      <div class="stat-l">Followers</div>
+    </div>
+  </section>
+
+  <div class="label rise" style="animation-delay:.3s">Featured project</div>
+  <section class="feat rise" style="animation-delay:.36s" id="featured">
+    <div class="feat-head">
+      <span class="feat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></span>
+      <div style="min-width:0">
+        <div class="feat-title">AlwaysStrong</div>
+        <div class="feat-sub">
+          <span class="badge"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg><span class="tnum" id="feat-stars">122</span></span>
+          <span class="pill-live"><span class="d"></span> LIVE ON GITHUB</span>
+        </div>
+      </div>
+    </div>
+    <p class="feat-desc">Tired of renewing keyboxes by hand? <b>AlwaysStrong</b> keeps <b>Strong Play Integrity</b> in a single drop-in module. It bundles <b>TEESimulator-RS</b> and <b>PlayIntegrityFork</b> so device attestation stays strong without the constant manual maintenance.</p>
+    <div class="feat-tags">
+      <span class="feat-tag">android</span><span class="feat-tag">attestation</span>
+      <span class="feat-tag">play-integrity</span><span class="feat-tag">kernelsu</span><span class="feat-tag">magisk</span>
+    </div>
+    <div class="feat-actions">
+      <a class="feat-cta primary" href="https://github.com/evoker0/AlwaysStrong" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.1-1.47-1.1-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg>
+        View on GitHub</a>
+      <a class="feat-cta ghost" href="/keys" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+        Keybox repository</a>
+    </div>
+  </section>
+
+  <div class="label reveal">About</div>
+  <p class="about reveal">I'm a <b>freelance Android developer</b> building modules and tools for the root community. Most of my work lives around <b>Magisk</b>, <b>KernelSU</b> and <b>APatch</b>, with a focus on Play Integrity, attestation and keeping devices strong. I share my builds and updates across my channels, and I'm open to freelance projects and collaborations. If you have something in mind, reach me on Telegram at <a href="https://t.me/evokerr" target="_blank" rel="noopener">@evokerr</a>.</p>
+
+  <div class="label reveal">Stack</div>
+  <div class="chips reveal">
+    <span class="chip">Android</span><span class="chip">Kotlin</span><span class="chip">Java</span>
+    <span class="chip">Shell</span><span class="chip">C / C++</span><span class="chip">Magisk</span>
+    <span class="chip">KernelSU</span><span class="chip">APatch</span><span class="chip">Play Integrity</span>
+    <span class="chip">Linux</span><span class="chip">Git</span><span class="chip">Bash</span>
+  </div>
+
+  <div class="label reveal">Services</div>
+  <div class="svc-grid reveal">
+    <div class="svc">
+      <div class="svc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.3 7 12 12l8.7-5M12 22V12"/></svg></div>
+      <h3>Modules</h3><p>Custom Magisk, KernelSU and APatch modules built to spec, clean and maintainable.</p>
+    </div>
+    <div class="svc">
+      <div class="svc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></div>
+      <h3>Root &amp; integrity</h3><p>Root hiding, Play Integrity and detection troubleshooting on real devices.</p>
+    </div>
+    <div class="svc">
+      <div class="svc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 17 6-6-6-6M12 19h8"/></svg></div>
+      <h3>Automation &amp; tooling</h3><p>Shell tooling, CI pipelines and Android automation scripts that just work.</p>
+    </div>
+    <div class="svc">
+      <div class="svc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+      <h3>Consulting</h3><p>Debugging, code review and technical consulting for Android root projects.</p>
+    </div>
+  </div>
+
+  <div class="label reveal">Channels</div>
+  <div id="channels" class="reveal"></div>
+
+  <div class="label reveal">More projects</div>
+  <div id="projects" class="proj-grid reveal"><p class="about">Loading…</p></div>
+
+  <div class="label reveal">Support</div>
+  <a class="donate reveal" href="https://coindrop.to/evokerrr" target="_blank" rel="noopener">
+    <span class="donate-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 0 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V8z"/><path d="M6 2v2M10 2v2M14 2v2"/></svg></span>
+    <span class="donate-main"><span class="donate-title">Support my work</span>
+      <span class="donate-sub">If my projects help you, donations are always appreciated. coindrop.to/evokerrr</span></span>
+    <span class="ch-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+  </a>
+
+  <footer class="reveal">
+    <span>© <span id="year">2026</span> evoker</span>
+    <span class="foot-links">
+      <a href="https://github.com/evoker0" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://t.me/evokerr" target="_blank" rel="noopener">Telegram</a>
+      <a href="/keys" target="_blank" rel="noopener">Keybox repo</a>
+    </span>
+  </footer>
+</main>
+
+<script>
+/* ============================================================
+   EDIT YOUR CHANNELS HERE. Add or remove lines freely.
+   { name: shown title, user: telegram @username (no @), desc: short line }
+   ============================================================ */
+const CHANNELS = [
+  { name: "Keybox Strong", user: "keyboxstrong", desc: "Fresh Android keyboxes & status" },
+  { name: "Evoker Root",   user: "evokeroot",    desc: "Builds, releases & updates" },
+  // { name: "Your channel", user: "username", desc: "short description" },
+];
+
+const $=s=>document.querySelector(s);
+$('#year').textContent=new Date().getFullYear();
+
+
+/* subtle hero parallax on the avatar (desktop, motion-ok, cheap transform) */
+(function(){
+  const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+  if(reduce || !matchMedia('(hover:hover)').matches) return;
+  const av=document.querySelector('.av-wrap');
+  if(!av) return;
+  let mx=innerWidth/2,my=innerHeight*0.28,raf=0;
+  addEventListener('pointermove',e=>{
+    mx=e.clientX; my=e.clientY;
+    if(!raf) raf=requestAnimationFrame(()=>{
+      raf=0;
+      const x=mx/innerWidth-0.5,y=my/innerHeight-0.5;
+      av.style.transform=`translate(${x*9}px,${y*7}px)`;
+    });
+  },{passive:true});
+})();
+
+/* theme toggle */
+const SUN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+const MOON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+const tb=$('#theme'); const paint=()=>tb.innerHTML=document.documentElement.classList.contains('dark')?SUN:MOON; paint();
+tb.addEventListener('click',()=>{const d=document.documentElement.classList.toggle('dark');localStorage.setItem('theme',d?'dark':'light');paint();});
+
+/* render channels */
+const TG='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.9 4.3l-3.3 15.6c-.25 1.1-.9 1.37-1.83.85l-5.05-3.72-2.44 2.35c-.27.27-.5.5-1 .5l.36-5.14L17.4 6.4c.4-.36-.09-.56-.62-.2L6.15 13.1 1.2 11.55c-1.08-.34-1.1-1.08.23-1.6L20.5 2.5c.9-.33 1.68.2 1.4 1.8z"/></svg>';
+const ARR='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+const esc=s=>(s||'').replace(/[<>&]/g,'');
+const box=$('#channels');
+CHANNELS.forEach((c)=>{
+  const a=document.createElement('a');
+  a.className='ch'; a.href=`https://t.me/${c.user}`; a.target='_blank'; a.rel='noopener';
+  a.innerHTML=`<span class="ch-ic">${TG}</span>
+    <span class="ch-main"><span class="ch-name">${esc(c.name)}</span>
+      <span class="ch-user">@${esc(c.user)}</span>${c.desc?`<span class="ch-desc">${esc(c.desc)}</span>`:''}</span>
+    <span class="ch-arrow">${ARR}</span>`;
+  box.appendChild(a);
+});
+
+/* count-up helper (cheap, one rAF chain, respects reduced-motion) */
+const reduceMo=matchMedia('(prefers-reduced-motion:reduce)').matches;
+function countTo(el,val){
+  if(!el) return;
+  const n=Number(val)||0;
+  if(reduceMo||n<=0){el.textContent=n.toLocaleString();return;}
+  const dur=700, t0=performance.now();
+  (function step(t){
+    const p=Math.min(1,(t-t0)/dur), e=1-Math.pow(1-p,3);
+    el.textContent=Math.round(n*e).toLocaleString();
+    if(p<1) requestAnimationFrame(step);
+  })(t0);
+}
+
+/* projects + live stats: my GitHub repos with 10+ stars */
+const GH='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.1-1.47-1.1-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg>';
+const STAR='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>';
+function projCard(r){
+  const tags=(r.topics||[]).slice(0,5).map(t=>`<span class="proj-tag">${esc(t)}</span>`).join('');
+  return `<a class="proj" href="${r.html_url}" target="_blank" rel="noopener">
+    <div class="proj-top"><span class="proj-ic">${GH}</span>
+      <div><div class="proj-name">${esc(r.name)}</div>
+      <div class="proj-lang">${r.language?`<span class="dot"></span>${esc(r.language)}`:''}</div></div>
+      <span class="proj-star">${STAR}<span class="tnum">${(r.stargazers_count||0).toLocaleString()}</span></span></div>
+    ${r.description?`<p class="proj-desc">${esc(r.description)}</p>`:''}
+    ${tags?`<div class="proj-tags">${tags}</div>`:''}</a>`;
+}
+async function load(){
+  const pbox=$('#projects');
+  const fb=[{name:'AlwaysStrong',html_url:'https://github.com/evoker0/AlwaysStrong',language:'Shell',stargazers_count:122,
+    description:'Always Strong: Strong Play Integrity in one drop-in module. TEESimulator-RS + PlayIntegrityFork bundled.',
+    topics:['android','attestation','kernelsu','magisk']}];
+  let repos=null, user=null;
+  try{
+    const [ru,uu]=await Promise.all([
+      fetch('https://api.github.com/users/evoker0/repos?per_page=100&type=owner'),
+      fetch('https://api.github.com/users/evoker0')
+    ]);
+    if(ru.ok) repos=await ru.json();
+    if(uu.ok) user=await uu.json();
+  }catch(e){}
+
+  // stats
+  if(repos){
+    const totalStars=repos.reduce((s,r)=>s+(r.stargazers_count||0),0);
+    countTo($('#s-stars'),totalStars);
+    countTo($('#s-repos'),(user&&user.public_repos)||repos.length);
+    const as=repos.find(r=>r.name==='AlwaysStrong');
+    if(as) $('#feat-stars').textContent=(as.stargazers_count||122).toLocaleString();
+  }else{
+    countTo($('#s-stars'),122); countTo($('#s-repos'),1);
+  }
+  if(user) countTo($('#s-followers'),user.followers||0);
+  else countTo($('#s-followers'),0);
+
+  // more projects (10+ stars, excluding the featured one)
+  let list=fb;
+  if(repos){
+    const f=repos.filter(r=>!r.fork && r.stargazers_count>=10).sort((a,b)=>b.stargazers_count-a.stargazers_count);
+    if(f.length) list=f;
+  }
+  const rest=list.filter(r=>r.name!=='AlwaysStrong');
+  pbox.innerHTML = rest.length ? rest.map(projCard).join('')
+    : `<p class="about">AlwaysStrong is my flagship module above. More public projects are on <a href="https://github.com/evoker0" target="_blank" rel="noopener">GitHub</a>.</p>`;
+}
+load();
+
+/* reveal-on-scroll for lower sections (cheap, native) */
+(function(){
+  const els=document.querySelectorAll('.reveal');
+  if(matchMedia('(prefers-reduced-motion:reduce)').matches){els.forEach(e=>e.classList.add('show'));return;}
+  const io=new IntersectionObserver(es=>es.forEach(x=>{
+    if(x.isIntersecting){x.target.classList.add('show');io.unobserve(x.target);}
+  }),{threshold:.12,rootMargin:'0px 0px -40px 0px'});
+  els.forEach(e=>io.observe(e));
+})();
+</script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"d23e96a30f9449beb877926092e9aa18","r":1}' crossorigin="anonymous"></script>
+</body>
+</html>
