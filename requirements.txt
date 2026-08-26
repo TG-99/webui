@@ -1,8 +1,0 @@
-fastapi
-uvicorn
-pymongo
-httpx
-pydantic
-dnspython
-python-dotenv
-cryptography
