@@ -48,6 +48,9 @@
                 <button class="tab-btn" data-tab="db" type="button">
                     <i class="fa-solid fa-database"></i> DB Explorer
                 </button>
+                <button class="tab-btn" data-tab="keybox" type="button">
+                    <i class="fa-solid fa-key"></i> Keybox Checker
+                </button>
             </nav>
 
             <div class="header-actions">
@@ -406,6 +409,95 @@
                 </div>
             </div>
         </div>
+
+    <!-- Keybox Checker Tab Content -->
+    <div id="keybox-tab-content" class="tab-content" style="display: none;">
+        <div class="keybox-dashboard">
+            <!-- Left Column: Verification Portal -->
+            <div class="keybox-portal-panel glass-panel verifier-card">
+                <div class="panel-header">
+                    <div class="header-title-wrap">
+                        <h2><i class="fa-solid fa-shield-halved"></i> Keybox Attestation Verifier</h2>
+                        <p>Verify Android Attestation keys and check real-time Google revocation status</p>
+                    </div>
+                </div>
+
+                <!-- Input Method Selector Switcher -->
+                <div class="input-method-selector">
+                    <button type="button" class="method-btn active" data-method="upload">
+                        <i class="fa-solid fa-file-arrow-up"></i> File Upload
+                    </button>
+                    <button type="button" class="method-btn" data-method="paste">
+                        <i class="fa-solid fa-code"></i> Paste XML Code
+                    </button>
+                </div>
+
+                <div class="portal-body">
+                    <!-- Method 1: File Upload Container -->
+                    <div id="method-upload-container" class="method-container active">
+                        <div id="keybox-dropzone" class="dropzone-area">
+                            <div class="dropzone-glow"></div>
+                            <div class="dropzone-content">
+                                <div class="dropzone-icon">
+                                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                                </div>
+                                <h3>Drag & Drop keybox.xml</h3>
+                                <p>or click to browse your local files</p>
+                                <div id="selected-file-info" class="selected-file-info hidden">
+                                    <i class="fa-solid fa-file-code"></i>
+                                    <span id="selected-file-name">filename.xml</span>
+                                </div>
+                            </div>
+                            <input type="file" id="keybox-file-input" accept=".xml" style="display: none;">
+                        </div>
+                    </div>
+
+                    <!-- Method 2: Raw XML Editor Paste Container -->
+                    <div id="method-paste-container" class="method-container" style="display: none;">
+                        <div class="code-editor-box">
+                            <div class="editor-header-bar">
+                                <span class="lang-badge">XML</span>
+                                <span class="editor-status-indicator" id="xml-editor-status">Ready</span>
+                            </div>
+                            <textarea id="keybox-xml-paste" placeholder="Paste your <AndroidAttestation> xml block here..." spellcheck="false"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="portal-actions">
+                        <button id="btn-reset-keybox" class="btn btn-outline" type="button">
+                            <i class="fa-solid fa-rotate-left"></i> Reset
+                        </button>
+                        <button id="btn-verify-keybox" class="btn btn-primary" type="button">
+                            <i class="fa-solid fa-circle-check"></i> Verify Keybox
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Right Column: Stored Active Pool -->
+            <div class="keybox-pool-panel glass-panel">
+                <div class="panel-header">
+                    <div class="header-title-wrap">
+                        <h2 style="display: flex; align-items: center; gap: 10px;">
+                            <i class="fa-solid fa-key" style="color: var(--primary);"></i> Active Keybox Pool
+                            <span class="pool-count-badge" id="val-pool-count">0</span>
+                        </h2>
+                        <p>Currently valid keyboxes stored in the database</p>
+                    </div>
+                    <button id="btn-refresh-pool" class="icon-btn-refresh" title="Refresh Pool" type="button">
+                        <i class="fa-solid fa-rotate"></i>
+                    </button>
+                </div>
+
+                <!-- Redesigned Pool Grid Container -->
+                <div id="pool-grid-container" class="pool-grid">
+                    <!-- Cards will be injected here by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
     </div>
 
     <!-- Modal Form (Add / Edit Target) -->
@@ -579,10 +671,28 @@
         <div id="db-toast-container" class="toast-container"></div>
     </div>
 
+    <!-- Keybox Result Modal Popup -->
+    <div class="modal-overlay" id="keybox-result-modal">
+        <div class="modal-content glass-panel popup-anim" style="max-width: 600px; width: 90%; max-height: 80vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; border: 1px solid var(--border-color); box-shadow: var(--shadow-lg);">
+            <div class="modal-header" style="padding: 14px 20px; border-bottom: 1px solid var(--border-color); flex-shrink: 0; display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="margin: 0; font-size: 16px; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-square-poll-horizontal" style="color: var(--primary);"></i> Keybox Check Details
+                </h2>
+                <button class="close-btn" onclick="window.closeKeyboxResultModal()" aria-label="Close Modal" style="font-size: 20px; background: transparent; border: none; color: var(--text-muted); cursor: pointer; transition: color var(--transition-fast) ease;">&times;</button>
+            </div>
+            <div class="modal-body-scroll" style="padding: 16px 20px; overflow-y: auto; flex-grow: 1;">
+                <div id="keybox-result-container">
+                    <!-- JS will inject results here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notification Container -->
     <div class="toast-container" id="toast-container"></div>
 
     <script src="/static/js/app.js" defer></script>
+    <script src="/static/js/keybox.js" defer></script>
 </body>
 
 </html>

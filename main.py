@@ -98,6 +98,8 @@ def init_db():
         
         # Enforce unique index on url in targets collection
         db.targets.create_index("url", unique=True)
+        # Enforce unique index on serial_number in keyboxes collection
+        db.keyboxes.create_index("serial_number", unique=True)
         # Create helper index for log queries
         db.ping_logs.create_index("target_id")
         db.ping_logs.create_index("timestamp")
@@ -486,6 +488,429 @@ async def self_ping_loop():
 
 
 # ==========================================
+# 4.5 KEYBOX CHECKER AND MANAGER LAYER
+# ==========================================
+import xml.etree.ElementTree as ET
+import re
+import base64
+from cryptography import x509
+from cryptography.hazmat.primitives.serialization import load_pem_private_key, load_pem_public_key, load_der_private_key, Encoding, PublicFormat
+from cryptography.hazmat.primitives.asymmetric import rsa, ec
+
+# Google hardware attestation root public key (RSA 4096)
+GOOGLE_ROOT_PEM = """-----BEGIN PUBLIC KEY-----
+MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAr7bHgiuxpwHsK7Qui8xU
+FmOr75gvMsd/dTEDDJdSSxtf6An7xyqpRR90PL2abxM1dEqlXnf2tqw1Ne4Xwl5j
+lRfdnJLmN0pTy/4lj4/7tv0Sk3iiKkypnEUtR6WfMgH0QZfKHM1+di+y9TFRtv6y
+//0rb+T+W8a9nsNL/ggjnar86461qO0rOs2cXjp3kOG1FEJ5MVmFmBGtnrKpa73X
+pXyTqRxB/M0n1n/W9nGqC4FSYa04T6N5RIZGBN2z2MT5IKGbFlbC8UrW0DxW7AYI
+mQQcHtGl/m00QLVWutHQoVJYnFPlXTcHYvASLu+RhhsbDmxMgJJ0mcDpvsC4PjvB
++TxywElgS70vE0XmLD+OJtvsBslHZvPBKCOdT0MS+tgSOIfga+z1Z1g7+DVagf7q
+uvmag8jfPioyKvxnK/EgsTUVi2ghzq8wm27ud/mIM7AY2qEORR8Go3TVB4HzWQgp
+Zrt3i5MIlCaY504LzSRiigHCzAPlHws+W0rB5N+er5/2pJKnfBSDiCiFAVtCLOZ7
+gLiMm0jhO2B6tUXHI/+MRPjy02i59lINMRRev56GKtcd9qO/0kUJWdZTdA2XoS82
+ixPvZtXQpUpuL12ab+9EaDK8Z4RHJYYfCT3Q5vNAXaiWQ+8PTWm2QgBR/bkwSWc+
+NpUFgNPN9PvQi8WEg5UmAGMCAwEAAQ==
+-----END PUBLIC KEY-----"""
+
+# AOSP software attestation root public key (EC P-256)
+AOSP_EC_ROOT_PEM = """-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE7l1ex+HA220Dpn7mthvsTWpdamgu
+D/9/SQ59dx9EIm29sa/6FsvHrcV30lacqrewLVQBXT5DKyqO107sSHVBpA==
+-----END PUBLIC KEY-----"""
+
+# AOSP software attestation root public key (RSA 1024)
+AOSP_RSA_ROOT_PEM = """-----BEGIN PUBLIC KEY-----
+MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCia63rbi5EYe/VDoLmt5TRdSMf
+d5tjkWP/96r/C3JHTsAsQ+wzfNes7UA+jCigZtX3hwszl94OuE4TQKuvpSe/lWmg
+MdsGUmX4RFlXYfC78hdLt0GAZMAoDo9Sd47b0ke2RekZyOmLw9vCkT/X11DEHTVm
++Vfkl5YLCazOkjWFmwIDAQAB
+-----END PUBLIC KEY-----"""
+
+# Samsung Knox attestation root public key (EC P-521)
+KNOX_ROOT_PEM = """-----BEGIN PUBLIC KEY-----
+MIGbMBAGByqGSM49AgEGBSuBBAAjA4GGAAQBhbGuLrpql5I2WJmrE5kEVZOo+dgA
+46mKrVJf/sgzfzs2u7M9c1Y9ZkCEiiYkhTFE9vPbasmUfXybwgZ2EM30A1ABPd12
+4n3JbEDfsB/wnMH1AcgsJyJFPbETZiy42Fhwi+2BCA5bcHe7SrdkRIYSsdBRaKBo
+ZsapxB0gAOs0jSPRX5M=
+-----END PUBLIC KEY-----"""
+
+# Cache public key DERs for identification
+def get_spki_der(pem_str: str) -> bytes:
+    pub_key = load_pem_public_key(pem_str.encode('utf-8'))
+    return pub_key.public_bytes(
+        encoding=Encoding.DER,
+        format=PublicFormat.SubjectPublicKeyInfo
+    )
+
+GOOGLE_ROOT_DER = get_spki_der(GOOGLE_ROOT_PEM)
+AOSP_EC_ROOT_DER = get_spki_der(AOSP_EC_ROOT_PEM)
+AOSP_RSA_ROOT_DER = get_spki_der(AOSP_RSA_ROOT_PEM)
+KNOX_ROOT_DER = get_spki_der(KNOX_ROOT_PEM)
+
+STATUS_FILE_PATH = os.path.join(CURRENT_DIR, "data", "attestation_status.json")
+
+def parse_keybox_xml(xml_content: str) -> Dict[str, Any]:
+    """Parses Android keybox XML string, extracting device ID, algorithm, private key and cert chain."""
+    try:
+        # Strip and clean encoding declaration if any
+        cleaned_xml = xml_content.strip()
+        cleaned_xml = re.sub(r'<\?xml.*?\?>', '', cleaned_xml).strip()
+        root = ET.fromstring(cleaned_xml)
+    except Exception as e:
+        logger.error(f"XML Parsing Exception: {e}")
+        raise ValueError(f"Invalid XML syntax: {str(e)}")
+
+    keybox = None
+    if root.tag.endswith('AndroidAttestation'):
+        for child in root:
+            if child.tag.endswith('Keybox'):
+                keybox = child
+                break
+    else:
+        if root.tag.endswith('Keybox'):
+            keybox = root
+
+    if not keybox:
+        for elem in root.iter():
+            if elem.tag.endswith('Keybox'):
+                keybox = elem
+                break
+
+    if not keybox:
+        raise ValueError("Invalid Keybox XML: missing AndroidAttestation/Keybox element structure.")
+
+    device_id = 'Unknown'
+    for k, v in keybox.attrib.items():
+        if k.lower().endswith('deviceid'):
+            device_id = v
+            break
+
+    key_elems = [e for e in keybox if e.tag.endswith('Key')]
+    if not key_elems:
+        raise ValueError("Invalid Keybox XML: missing Key element.")
+
+    key_elem = key_elems[0]
+    algorithm = 'Unknown'
+    for k, v in key_elem.attrib.items():
+        if k.lower().endswith('algorithm'):
+            algorithm = v
+            break
+
+    private_key_pem = ''
+    cert_chain_elem = None
+    for child in key_elem:
+        if child.tag.endswith('PrivateKey'):
+            private_key_pem = (child.text or '').strip()
+        elif child.tag.endswith('CertificateChain'):
+            cert_chain_elem = child
+
+    if not cert_chain_elem:
+        raise ValueError("Invalid Keybox XML: missing CertificateChain element.")
+
+    # Extract all certificates
+    cert_pems = []
+    for child in cert_chain_elem:
+        if child.tag.endswith('Certificate'):
+            child_text = (child.text or '').strip()
+            if child_text:
+                # Find all PEM wrappers in the text
+                certs_found = []
+                pattern = re.compile(r'-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----', re.DOTALL)
+                for match in pattern.finditer(child_text):
+                    certs_found.append(match.group(0).strip())
+                
+                # If no PEM found but text exists, assume raw base64 and wrap it
+                if not certs_found:
+                    base64_only = re.sub(r'\s+', '', child_text)
+                    if base64_only:
+                        certs_found.append(f"-----BEGIN CERTIFICATE-----\n{base64_only}\n-----END CERTIFICATE-----")
+                
+                cert_pems.extend(certs_found)
+
+    return {
+        'device_id': device_id,
+        'algorithm': algorithm,
+        'private_key_pem': private_key_pem,
+        'cert_pems': cert_pems
+    }
+
+def load_private_key_robust(priv_key_str: str, cert_pub_key) -> Any:
+    """Robustly load a private key in PEM or base64 DER format."""
+    cleaned = priv_key_str.strip()
+
+    # Try PEM
+    if "BEGIN" in cleaned:
+        try:
+            return load_pem_private_key(cleaned.encode('utf-8'), password=None)
+        except Exception:
+            pass
+
+    # Try base64-encoded DER
+    base64_data = cleaned
+    for header in ["-----BEGIN RSA PRIVATE KEY-----", "-----END RSA PRIVATE KEY-----",
+                   "-----BEGIN EC PRIVATE KEY-----", "-----END EC PRIVATE KEY-----",
+                   "-----BEGIN PRIVATE KEY-----", "-----END PRIVATE KEY-----"]:
+        base64_data = base64_data.replace(header, "")
+    base64_data = re.sub(r'\s+', '', base64_data)
+
+    try:
+        der_bytes = base64.b64decode(base64_data)
+        return load_der_private_key(der_bytes, password=None)
+    except Exception:
+        pass
+
+    # If it failed but algorithm is EC, SEC1 EC keys can be wrapped in PKCS#8 or loaded directly if base64.
+    # We raise an error if all loading methods failed.
+    raise ValueError("Could not parse private key format (PEM or raw DER).")
+
+def check_cert_validity(cert: x509.Certificate) -> Dict[str, Any]:
+    """Helper to verify certificate active/expired status against current UTC time."""
+    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    try:
+        not_before = cert.not_valid_before_utc
+        not_after = cert.not_valid_after_utc
+    except AttributeError:
+        not_before = cert.not_valid_before.replace(tzinfo=datetime.timezone.utc)
+        not_after = cert.not_valid_after.replace(tzinfo=datetime.timezone.utc)
+
+    return {
+        'valid': not_before <= now_utc <= not_after,
+        'expired': now_utc > not_after,
+        'not_before': not_before,
+        'not_after': not_after
+    }
+
+def verify_certificate_chain(certs: List[x509.Certificate]) -> bool:
+    """Verify certificate signatures up the chain."""
+    if len(certs) <= 1:
+        return True
+    try:
+        for i in range(len(certs) - 1):
+            child = certs[i]
+            parent = certs[i + 1]
+            child.verify_directly_issued_by(parent)
+        return True
+    except Exception as e:
+        logger.error(f"Cert signature verification error: {e}")
+        return False
+
+def identify_root(root_cert: x509.Certificate) -> str:
+    """Compare SPKI DER to match known Attestation Root Certs."""
+    try:
+        root_spki = root_cert.public_key().public_bytes(
+            encoding=Encoding.DER,
+            format=PublicFormat.SubjectPublicKeyInfo
+        )
+        if root_spki == GOOGLE_ROOT_DER:
+            return "google"
+        elif root_spki == AOSP_EC_ROOT_DER:
+            return "aosp_ec"
+        elif root_spki == AOSP_RSA_ROOT_DER:
+            return "aosp_rsa"
+        elif root_spki == KNOX_ROOT_DER:
+            return "knox"
+    except Exception:
+        pass
+    return "unknown"
+
+def check_revocation_status(certs: List[x509.Certificate]) -> Dict[str, Any]:
+    """Check both hex and decimal serial numbers against local revocation database."""
+    if not os.path.exists(STATUS_FILE_PATH):
+        return {
+            'revoked': False,
+            'reason': "⚠️ Revocation database not yet downloaded."
+        }
+
+    try:
+        with open(STATUS_FILE_PATH, 'r') as f:
+            status_data = json.load(f)
+        
+        entries = status_data.get('entries', {})
+        for cert in certs:
+            sn_int = cert.serial_number
+            sn_hex = format(sn_int, 'x').lower()
+            sn_dec = str(sn_int)
+
+            if sn_hex in entries:
+                return {'revoked': True, 'reason': entries[sn_hex].get('reason', 'REVOKED')}
+            elif sn_dec in entries:
+                return {'revoked': True, 'reason': entries[sn_dec].get('reason', 'REVOKED')}
+    except Exception as e:
+        logger.error(f"Error checking attestation status: {e}")
+        return {'revoked': False, 'reason': f"⚠️ Check error: {str(e)}"}
+
+    return {'revoked': False, 'reason': None}
+
+def validate_keybox_xml(xml_content: str) -> Dict[str, Any]:
+    """Main verification validator for Keyboxes."""
+    parsed = parse_keybox_xml(xml_content)
+    device_id = parsed['device_id']
+    algorithm = parsed['algorithm']
+    private_key_pem = parsed['private_key_pem']
+    cert_pems = parsed['cert_pems']
+
+    if not cert_pems:
+        raise ValueError("No certificates found in Keybox.")
+
+    certs = []
+    for pem in cert_pems:
+        certs.append(x509.load_pem_x509_certificate(pem.encode('utf-8')))
+
+    leaf_cert = certs[0]
+    serial_number_hex = format(leaf_cert.serial_number, 'x').lower()
+
+    # Format subject name cleanly
+    try:
+        subject_str = leaf_cert.subject.rfc4514_string()
+    except Exception:
+        subject_str = str(leaf_cert.subject)
+
+    val_info = check_cert_validity(leaf_cert)
+    cert_valid = val_info['valid']
+    cert_expired = val_info['expired']
+
+    private_key_match = None
+    if private_key_pem:
+        try:
+            priv_key = load_private_key_robust(private_key_pem, leaf_cert.public_key())
+            priv_pub_der = priv_key.public_key().public_bytes(
+                encoding=Encoding.DER,
+                format=PublicFormat.SubjectPublicKeyInfo
+            )
+            cert_pub_der = leaf_cert.public_key().public_bytes(
+                encoding=Encoding.DER,
+                format=PublicFormat.SubjectPublicKeyInfo
+            )
+            private_key_match = (priv_pub_der == cert_pub_der)
+        except Exception as e:
+            logger.error(f"Private key match verification exception: {e}")
+            private_key_match = False
+
+    chain_valid = verify_certificate_chain(certs)
+    root_cert = certs[-1]
+    root_type = identify_root(root_cert)
+
+    rev_info = check_revocation_status(certs)
+    revoked = rev_info['revoked']
+    revoke_reason = rev_info['reason']
+
+    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    check_time = now_utc.strftime("%Y-%m-%d %H:%M:%S")
+
+    cert_infos = []
+    for idx, cert in enumerate(certs):
+        c_val = check_cert_validity(cert)
+        try:
+            c_sub = cert.subject.rfc4514_string()
+            c_iss = cert.issuer.rfc4514_string()
+        except Exception:
+            c_sub = str(cert.subject)
+            c_iss = str(cert.issuer)
+
+        cert_infos.append({
+            'level': idx,
+            'serialNumber': format(cert.serial_number, 'x').lower(),
+            'subject': c_sub,
+            'issuer': c_iss,
+            'notBefore': c_val['not_before'].strftime("%Y-%m-%d %H:%M:%S"),
+            'notAfter': c_val['not_after'].strftime("%Y-%m-%d %H:%M:%S"),
+            'isValid': c_val['valid'],
+            'isExpired': c_val['expired']
+        })
+
+    return {
+        'deviceId': device_id,
+        'algorithm': algorithm,
+        'serialNumber': serial_number_hex,
+        'subject': subject_str,
+        'certValid': cert_valid,
+        'certExpired': cert_expired,
+        'privateKeyMatch': private_key_match,
+        'chainValid': chain_valid,
+        'rootType': root_type,
+        'certCount': len(certs),
+        'revoked': revoked,
+        'revokeReason': revoke_reason,
+        'checkTime': check_time,
+        'certInfos': cert_infos
+    }
+
+async def update_attestation_status_loop():
+    """Background downloader loop that refreshes Google's attestation status file."""
+    logger.info("Background Google attestation status downloader loop started.")
+    data_dir = os.path.join(CURRENT_DIR, "data")
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+
+    url = "https://android.googleapis.com/attestation/status"
+    while True:
+        try:
+            logger.info("Downloading latest attestation status list from Google...")
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(f"{url}?ts={int(time.time())}", headers={
+                    "Cache-Control": "max-age=0, no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache"
+                })
+                if response.status_code == 200:
+                    status_json = response.json()
+                    with open(STATUS_FILE_PATH, 'w') as f:
+                        json.dump(status_json, f)
+                    logger.info(f"Successfully updated attestation status list ({len(status_json.get('entries', {}))} entries).")
+                else:
+                    logger.error(f"Failed to fetch Google attestation status list: HTTP {response.status_code}")
+        except Exception as e:
+            logger.error(f"Error in attestation status downloader loop: {e}")
+
+        await asyncio.sleep(10800) # Every 3 hours
+
+async def verify_stored_keyboxes_loop():
+    """Background periodic checker that validates stored keyboxes and deletes invalid/revoked ones."""
+    logger.info("Background stored keybox verification loop started.")
+    await asyncio.sleep(60) # Wait 1 minute after start to let database init fully
+
+    while True:
+        try:
+            stored_keyboxes = list(db.keyboxes.find())
+            if stored_keyboxes:
+                logger.info(f"Re-verifying {len(stored_keyboxes)} stored keyboxes...")
+                for kb in stored_keyboxes:
+                    xml_content = kb.get('xml_content')
+                    serial_number = kb.get('serial_number')
+                    if not xml_content or not serial_number:
+                        continue
+
+                    try:
+                        res = validate_keybox_xml(xml_content)
+                        # Check validation flags
+                        is_valid = (
+                            res['certValid'] and
+                            (not res['revoked']) and
+                            res['chainValid'] and
+                            (res['privateKeyMatch'] is not False)
+                        )
+                        if not is_valid:
+                            logger.warning(f"Keybox with serial {serial_number} is no longer valid. Deleting from database...")
+                            db.keyboxes.delete_one({'serial_number': serial_number})
+                        else:
+                            dhaka_tz = datetime.timezone(datetime.timedelta(hours=6))
+                            now_str = datetime.datetime.now(dhaka_tz).isoformat()
+                            db.keyboxes.update_one(
+                                {'serial_number': serial_number},
+                                {'$set': {'last_checked_at': now_str}}
+                            )
+                    except Exception as ve:
+                        logger.error(f"Keybox parser failed for stored keybox {serial_number} during periodic verification: {ve}. Deleting...")
+                        db.keyboxes.delete_one({'serial_number': serial_number})
+            else:
+                logger.debug("No stored keyboxes to verify in pool.")
+        except Exception as e:
+            logger.error(f"Error in keybox re-verification loop: {e}")
+
+        await asyncio.sleep(3600) # Every 1 hour
+
+
+# ==========================================
 # 5. FASTAPI APP & ROUTES
 # ==========================================
 @asynccontextmanager
@@ -498,6 +923,12 @@ async def lifespan(app: FastAPI):
     
     logger.info("Starting background self-ping keep-alive...")
     asyncio.create_task(self_ping_loop())
+
+    logger.info("Starting background Google attestation status downloader...")
+    asyncio.create_task(update_attestation_status_loop())
+
+    logger.info("Starting background keybox validator loop...")
+    asyncio.create_task(verify_stored_keyboxes_loop())
     yield
 
 app = FastAPI(title="Keep-Alive Manager API", version="1.0.0", lifespan=lifespan)
@@ -993,6 +1424,79 @@ def delete_document(req: DeleteDocumentRequest):
 @app.get("/api/config")
 def get_config():
     return {"predefined_uri": PREDEFINED_URI}
+
+
+class KeyboxCheckRequest(BaseModel):
+    xml_content: str
+
+@app.post("/api/keybox/check")
+def api_check_keybox(req: KeyboxCheckRequest):
+    """Parses and checks an Android Keybox XML, saving it if it is valid."""
+    try:
+        res = validate_keybox_xml(req.xml_content)
+        # Check if valid
+        is_valid = (
+            res['certValid'] and
+            (not res['revoked']) and
+            res['chainValid'] and
+            (res['privateKeyMatch'] is not False)
+        )
+        saved = False
+        if is_valid:
+            try:
+                dhaka_tz = datetime.timezone(datetime.timedelta(hours=6))
+                now_str = datetime.datetime.now(dhaka_tz).isoformat()
+                # Upsert into database
+                db.keyboxes.update_one(
+                    {"serial_number": res['serialNumber']},
+                    {"$set": {
+                        "device_id": res['deviceId'],
+                        "serial_number": res['serialNumber'],
+                        "algorithm": res['algorithm'],
+                        "root_type": res['rootType'],
+                        "xml_content": req.xml_content,
+                        "created_at": now_str,
+                        "last_checked_at": now_str,
+                        "status": "VALID"
+                    }},
+                    upsert=True
+                )
+                saved = True
+            except Exception as dbe:
+                logger.error(f"Failed to save valid keybox to database: {dbe}")
+                
+        return {
+            "success": is_valid,
+            "result": res,
+            "saved": saved
+        }
+    except Exception as e:
+        logger.error(f"Keybox validation endpoint exception: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/keyboxes")
+def api_get_keyboxes():
+    """Retrieve all stored valid keyboxes."""
+    try:
+        kbs = list(db.keyboxes.find().sort("created_at", -1))
+        return [serialize_doc(kb) for kb in kbs]
+    except Exception as e:
+        logger.error(f"Error fetching keyboxes: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error fetching keyboxes")
+
+@app.delete("/api/keyboxes/{serial_number}")
+def api_delete_keybox(serial_number: str):
+    """Delete a stored keybox by its serial number."""
+    try:
+        result = db.keyboxes.delete_one({"serial_number": serial_number})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Keybox not found")
+        return {"success": True, "message": "Keybox deleted successfully."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting keybox: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # Serve Frontend SPA

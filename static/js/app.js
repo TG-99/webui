@@ -90,10 +90,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const tabs = document.querySelectorAll('.tab-btn');
   const aliveTabContent = document.getElementById('alive-tab-content');
   const dbTabContent = document.getElementById('db-tab-content');
+  const keyboxTabContent = document.getElementById('keybox-tab-content');
 
   tabs.forEach(tab => {
     tab.addEventListener('click', () => {
       const targetTab = tab.getAttribute('data-tab');
+      
+      // Persist active tab selection to localStorage
+      localStorage.setItem('activeTab', targetTab);
       
       // Update active classes on tab buttons
       tabs.forEach(t => t.classList.remove('active'));
@@ -102,6 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (targetTab === 'alive') {
         aliveTabContent.style.display = 'block';
         dbTabContent.style.display = 'none';
+        keyboxTabContent.style.display = 'none';
         
         // Resume keep-alive polling if stopped
         if (!pollingInterval) {
@@ -111,6 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
       } else if (targetTab === 'db') {
         aliveTabContent.style.display = 'none';
         dbTabContent.style.display = 'block';
+        keyboxTabContent.style.display = 'none';
         
         // Pause keep-alive polling to save resources
         if (pollingInterval) {
@@ -122,9 +128,31 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.initDbExplorer) {
           window.initDbExplorer();
         }
+      } else if (targetTab === 'keybox') {
+        aliveTabContent.style.display = 'none';
+        dbTabContent.style.display = 'none';
+        keyboxTabContent.style.display = 'block';
+
+        // Pause keep-alive polling to save resources
+        if (pollingInterval) {
+          clearInterval(pollingInterval);
+          pollingInterval = null;
+        }
+
+        // Lazy initialize the Keybox Checker if not already initialized
+        if (window.initKeyboxChecker) {
+          window.initKeyboxChecker();
+        }
       }
     });
   });
+
+  // Load persisted active tab on page refresh
+  const activeTab = localStorage.getItem('activeTab') || 'alive';
+  if (activeTab !== 'alive') {
+    const tabToClick = document.querySelector(`.tab-btn[data-tab="${activeTab}"]`);
+    if (tabToClick) tabToClick.click();
+  }
 });
 
 // Toast notification function
