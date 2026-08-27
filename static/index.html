@@ -290,15 +290,16 @@
                         <!-- Top Explorer Bar -->
                         <header class="explorer-header">
                             <div class="breadcrumb">
-                            <button id="btn-toggle-sidebar" class="btn-icon btn-sidebar-toggle" title="Toggle Sidebar" type="button">
-                                <i class="fa-solid fa-bars"></i>
-                            </button>
-                            <span class="bc-home">Cluster</span>
-                            <span class="bc-sep">/</span>
-                            <span id="bc-db" class="bc-active">-</span>
-                            <span class="bc-sep">/</span>
-                            <span id="bc-coll" class="bc-active">-</span>
-                        </div>
+                                <button id="btn-toggle-sidebar" class="btn-icon btn-sidebar-toggle"
+                                    title="Toggle Sidebar" type="button">
+                                    <i class="fa-solid fa-bars"></i>
+                                </button>
+                                <span class="bc-home">Cluster</span>
+                                <span class="bc-sep">/</span>
+                                <span id="bc-db" class="bc-active">-</span>
+                                <span class="bc-sep">/</span>
+                                <span id="bc-coll" class="bc-active">-</span>
+                            </div>
                             <div class="header-actions">
                                 <button id="btn-add-doc" class="btn btn-success" disabled type="button">
                                     <i class="fa-solid fa-plus"></i> Add Document
@@ -410,94 +411,184 @@
             </div>
         </div>
 
-    <!-- Keybox Checker Tab Content -->
-    <div id="keybox-tab-content" class="tab-content" style="display: none;">
-        <div class="keybox-dashboard">
-            <!-- Left Column: Verification Portal -->
-            <div class="keybox-portal-panel glass-panel verifier-card">
-                <div class="panel-header">
-                    <div class="header-title-wrap">
-                        <h2><i class="fa-solid fa-shield-halved"></i> Keybox Attestation Verifier</h2>
-                        <p>Verify Android Attestation keys and check real-time Google revocation status</p>
-                    </div>
-                </div>
-
-                <!-- Input Method Selector Switcher -->
-                <div class="input-method-selector">
-                    <button type="button" class="method-btn active" data-method="upload">
-                        <i class="fa-solid fa-file-arrow-up"></i> File Upload
-                    </button>
-                    <button type="button" class="method-btn" data-method="paste">
-                        <i class="fa-solid fa-code"></i> Paste XML Code
-                    </button>
-                </div>
-
-                <div class="portal-body">
-                    <!-- Method 1: File Upload Container -->
-                    <div id="method-upload-container" class="method-container active">
-                        <div id="keybox-dropzone" class="dropzone-area">
-                            <div class="dropzone-glow"></div>
-                            <div class="dropzone-content">
-                                <div class="dropzone-icon">
-                                    <i class="fa-solid fa-cloud-arrow-up"></i>
-                                </div>
-                                <h3>Drag & Drop keybox.xml</h3>
-                                <p>or click to browse your local files</p>
-                                <div id="selected-file-info" class="selected-file-info hidden">
-                                    <i class="fa-solid fa-file-code"></i>
-                                    <span id="selected-file-name">filename.xml</span>
-                                </div>
-                            </div>
-                            <input type="file" id="keybox-file-input" accept=".xml" style="display: none;">
+        <!-- Keybox Checker Tab Content -->
+        <div id="keybox-tab-content" class="tab-content" style="display: none;">
+            <div class="keybox-dashboard">
+                <!-- Left Column: Verification Portal -->
+                <div class="keybox-portal-panel glass-panel verifier-card">
+                    <div class="panel-header">
+                        <div class="header-title-wrap">
+                            <h2><i class="fa-solid fa-shield-halved"></i> Keybox Attestation Verifier</h2>
+                            <p>Verify Android Attestation keys and check real-time Google revocation status</p>
                         </div>
                     </div>
 
-                    <!-- Method 2: Raw XML Editor Paste Container -->
-                    <div id="method-paste-container" class="method-container" style="display: none;">
-                        <div class="code-editor-box">
-                            <div class="editor-header-bar">
-                                <span class="lang-badge">XML</span>
-                                <span class="editor-status-indicator" id="xml-editor-status">Ready</span>
+                    <!-- Input Method Selector Switcher -->
+                    <div class="input-method-selector">
+                        <button type="button" class="method-btn active" data-method="upload">
+                            <i class="fa-solid fa-file-arrow-up"></i> File Upload
+                        </button>
+                        <button type="button" class="method-btn" data-method="paste">
+                            <i class="fa-solid fa-code"></i> Paste XML Code
+                        </button>
+                    </div>
+
+                    <div class="portal-body">
+                        <!-- Method 1: File Upload Container -->
+                        <div id="method-upload-container" class="method-container active">
+                            <div id="keybox-dropzone" class="dropzone-area">
+                                <div class="dropzone-glow"></div>
+                                <div class="dropzone-content">
+                                    <div class="dropzone-icon">
+                                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                                    </div>
+                                    <h3>Drag & Drop keybox.xml</h3>
+                                    <p>or click to browse your local files</p>
+                                    <div id="selected-file-info" class="selected-file-info hidden">
+                                        <i class="fa-solid fa-file-code"></i>
+                                        <span id="selected-file-name">filename.xml</span>
+                                    </div>
+                                </div>
+                                <input type="file" id="keybox-file-input" accept=".xml" style="display: none;">
                             </div>
-                            <textarea id="keybox-xml-paste" placeholder="Paste your <AndroidAttestation> xml block here..." spellcheck="false"></textarea>
+                        </div>
+
+                        <!-- Method 2: Raw XML Editor Paste Container -->
+                        <div id="method-paste-container" class="method-container" style="display: none;">
+                            <div class="code-editor-box">
+                                <div class="editor-header-bar">
+                                    <span class="lang-badge">XML</span>
+                                    <span class="editor-status-indicator" id="xml-editor-status">Ready</span>
+                                </div>
+                                <textarea id="keybox-xml-paste"
+                                    placeholder="Paste your <AndroidAttestation> xml block here..."
+                                    spellcheck="false"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="portal-actions">
+                            <button id="btn-reset-keybox" class="btn btn-outline" type="button">
+                                <i class="fa-solid fa-rotate-left"></i> Reset
+                            </button>
+                            <button id="btn-verify-keybox" class="btn btn-primary" type="button">
+                                <i class="fa-solid fa-circle-check"></i> Verify Keybox
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Right Column: Stored Active Pool -->
+                <div class="keybox-pool-panel glass-panel">
+                    <div class="panel-header">
+                        <div class="header-title-wrap">
+                            <h2 style="display: flex; align-items: center; gap: 10px;">
+                                <i class="fa-solid fa-key" style="color: var(--primary);"></i> Active Keybox Pool
+                                <span class="pool-count-badge" id="val-pool-count">0</span>
+                            </h2>
+                            <p>Recent keyboxes stored in database (Max 20, Valid on top)</p>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <button id="btn-open-scraper-modal" class="btn btn-telegram-launcher" type="button"
+                                title="Open Telegram Scraper Floating Window">
+                                <i class="fa-brands fa-telegram"></i> Telegram Scraper
+                                <span class="launcher-badge" id="launcher-channels-badge">0</span>
+                            </button>
+                            <button id="btn-refresh-pool" class="icon-btn-refresh" title="Refresh Pool" type="button">
+                                <i class="fa-solid fa-rotate"></i>
+                            </button>
                         </div>
                     </div>
 
-                    <!-- Action Buttons -->
-                    <div class="portal-actions">
-                        <button id="btn-reset-keybox" class="btn btn-outline" type="button">
-                            <i class="fa-solid fa-rotate-left"></i> Reset
-                        </button>
-                        <button id="btn-verify-keybox" class="btn btn-primary" type="button">
-                            <i class="fa-solid fa-circle-check"></i> Verify Keybox
-                        </button>
+                    <!-- Redesigned Pool Grid Container -->
+                    <div id="pool-grid-container" class="pool-grid">
+                        <!-- Cards will be injected here by JS -->
                     </div>
-
-                </div>
-            </div>
-
-            <!-- Right Column: Stored Active Pool -->
-            <div class="keybox-pool-panel glass-panel">
-                <div class="panel-header">
-                    <div class="header-title-wrap">
-                        <h2 style="display: flex; align-items: center; gap: 10px;">
-                            <i class="fa-solid fa-key" style="color: var(--primary);"></i> Active Keybox Pool
-                            <span class="pool-count-badge" id="val-pool-count">0</span>
-                        </h2>
-                        <p>Currently valid keyboxes stored in the database</p>
-                    </div>
-                    <button id="btn-refresh-pool" class="icon-btn-refresh" title="Refresh Pool" type="button">
-                        <i class="fa-solid fa-rotate"></i>
-                    </button>
-                </div>
-
-                <!-- Redesigned Pool Grid Container -->
-                <div id="pool-grid-container" class="pool-grid">
-                    <!-- Cards will be injected here by JS -->
                 </div>
             </div>
         </div>
-    </div>
+
+        <!-- Telegram Keybox Scraper Floating Window Modal -->
+        <div id="telegram-scraper-modal" class="modal-overlay scraper-floating-modal">
+            <div class="modal-content glass-panel scraper-modal-window popup-anim">
+                <!-- Scraper Header Bar (Minimal) -->
+                <div class="scraper-modal-header">
+                    <div class="scraper-title-group">
+                        <div class="telegram-icon-badge">
+                            <i class="fa-brands fa-telegram"></i>
+                        </div>
+                        <div>
+                            <h2 class="scraper-title">Telegram Keybox Scraper</h2>
+                            <p class="scraper-subtitle">Monitor Telegram channels for live Android Keybox XMLs &
+                                automatically validate keyboxes</p>
+                        </div>
+                    </div>
+                    <button class="close-btn" id="btn-close-scraper-modal" type="button"
+                        aria-label="Close Modal">&times;</button>
+                </div>
+
+                <!-- Scraper Modal Body -->
+                <div class="scraper-modal-body">
+                    <!-- Modern Channel Add & Global Actions Bar -->
+                    <div class="scraper-control-toolbar">
+                        <div class="scraper-add-bar">
+                            <i class="fa-solid fa-at input-at-icon"></i>
+                            <input type="text" id="scraper-add-channel-input" class="modern-scraper-input"
+                                placeholder="Enter Telegram channel (e.g. @blacktapecollection or @channel:100)" />
+                            <button id="btn-add-scraper-channel" class="btn-add-channel-action" type="button">
+                                <i class="fa-solid fa-plus"></i> Add Channel
+                            </button>
+                        </div>
+
+                        <div class="scraper-global-actions">
+                            <button id="btn-save-scraper-config" class="btn-save-channels" type="button"
+                                title="Save channels configuration">
+                                <i class="fa-solid fa-floppy-disk"></i> Save
+                            </button>
+                            <button id="btn-run-keybox-scraper" class="btn-scrape-run" type="button">
+                                <i class="fa-solid fa-bolt"></i> Scrape All Channels
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Configured Channels Grid (Each channel has live counters) -->
+                    <div class="scraper-channels-section" style="margin-top: 16px;">
+                        <div
+                            style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                            <h3
+                                style="font-size: 0.95rem; font-weight: 600; color: var(--text-main, #fff); margin: 0; display: flex; align-items: center; gap: 8px;">
+                                <i class="fa-solid fa-tower-cell" style="color: #0088cc;"></i> Channels Monitored (<span
+                                    id="channel-list-count">0</span>)
+                            </h3>
+                        </div>
+
+                        <div id="scraper-channels-grid" class="scraper-channels-grid">
+                            <!-- Dynamic channel cards injected via JS -->
+                        </div>
+                    </div>
+
+                    <!-- Scraper Activity Logs Section -->
+                    <div class="scraper-log-section" style="margin-top: 16px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                            <h3 style="font-size: 0.9rem; font-weight: 600; color: var(--text-main, #fff); margin: 0; display: flex; align-items: center; gap: 8px;">
+                                <i class="fa-solid fa-terminal" style="color: #0088cc;"></i> Scraper Activity Log
+                            </h3>
+                            <button id="btn-clear-scraper-logs" class="btn-clear-logs" type="button" title="Clear activity logs">
+                                <i class="fa-solid fa-trash-can"></i> Clear Log
+                            </button>
+                        </div>
+                        <div id="scraper-log-console" class="scraper-log-console">
+                            <div id="scraper-log-list" class="log-entries-list">
+                                <div class="log-entry info"><span class="log-tag info">INFO</span> Ready to scrape. Click 'Scrape All Channels' or wait for scheduled run.</div>
+                            </div>
+                        </div>
+                    </div>
+
+
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Modal Form (Add / Edit Target) -->
@@ -537,10 +628,12 @@
                         <input type="number" id="target-order" name="order" min="1" required
                             placeholder="e.g., 1, 2, 3">
                         <div class="number-spinner-btns">
-                            <button type="button" class="spinner-btn spinner-up" onclick="document.getElementById('target-order').stepUp();" title="Increase Index">
+                            <button type="button" class="spinner-btn spinner-up"
+                                onclick="document.getElementById('target-order').stepUp();" title="Increase Index">
                                 <i class="fa-solid fa-chevron-up"></i>
                             </button>
-                            <button type="button" class="spinner-btn spinner-down" onclick="document.getElementById('target-order').stepDown();" title="Decrease Index">
+                            <button type="button" class="spinner-btn spinner-down"
+                                onclick="document.getElementById('target-order').stepDown();" title="Decrease Index">
                                 <i class="fa-solid fa-chevron-down"></i>
                             </button>
                         </div>
@@ -673,12 +766,17 @@
 
     <!-- Keybox Result Modal Popup -->
     <div class="modal-overlay" id="keybox-result-modal">
-        <div class="modal-content glass-panel popup-anim" style="max-width: 600px; width: 90%; max-height: 80vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; border: 1px solid var(--border-color); box-shadow: var(--shadow-lg);">
-            <div class="modal-header" style="padding: 14px 20px; border-bottom: 1px solid var(--border-color); flex-shrink: 0; display: flex; justify-content: space-between; align-items: center;">
-                <h2 style="margin: 0; font-size: 16px; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
-                    <i class="fa-solid fa-square-poll-horizontal" style="color: var(--primary);"></i> Keybox Check Details
+        <div class="modal-content glass-panel popup-anim"
+            style="max-width: 600px; width: 90%; max-height: 80vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; border: 1px solid var(--border-color); box-shadow: var(--shadow-lg);">
+            <div class="modal-header"
+                style="padding: 14px 20px; border-bottom: 1px solid var(--border-color); flex-shrink: 0; display: flex; justify-content: space-between; align-items: center;">
+                <h2
+                    style="margin: 0; font-size: 16px; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-square-poll-horizontal" style="color: var(--primary);"></i> Keybox Check
+                    Details
                 </h2>
-                <button class="close-btn" onclick="window.closeKeyboxResultModal()" aria-label="Close Modal" style="font-size: 20px; background: transparent; border: none; color: var(--text-muted); cursor: pointer; transition: color var(--transition-fast) ease;">&times;</button>
+                <button class="close-btn" onclick="window.closeKeyboxResultModal()" aria-label="Close Modal"
+                    style="font-size: 20px; background: transparent; border: none; color: var(--text-muted); cursor: pointer; transition: color var(--transition-fast) ease;">&times;</button>
             </div>
             <div class="modal-body-scroll" style="padding: 16px 20px; overflow-y: auto; flex-grow: 1;">
                 <div id="keybox-result-container">

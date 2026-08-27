@@ -742,6 +742,39 @@ def check_revocation_status(certs: List[x509.Certificate]) -> Dict[str, Any]:
 
     return {'revoked': False, 'reason': None}
 
+
+def load_cert_robust(cert_str: str) -> x509.Certificate:
+    """Robustly load an x509 Certificate from PEM string or raw base64 DER bytes."""
+    cleaned = cert_str.strip()
+
+    # Direct PEM attempt
+    if "BEGIN CERTIFICATE" in cleaned:
+        try:
+            return x509.load_pem_x509_certificate(cleaned.encode('utf-8'))
+        except Exception:
+            pass
+
+    # Clean base64 string
+    base64_data = cleaned
+    for header in ["-----BEGIN CERTIFICATE-----", "-----END CERTIFICATE-----"]:
+        base64_data = base64_data.replace(header, "")
+    base64_data = re.sub(r'\s+', '', base64_data)
+
+    # Try standard PEM format with 64-char line breaks
+    wrapped_pem = "-----BEGIN CERTIFICATE-----\n" + "\n".join([base64_data[i:i+64] for i in range(0, len(base64_data), 64)]) + "\n-----END CERTIFICATE-----"
+    try:
+        return x509.load_pem_x509_certificate(wrapped_pem.encode('utf-8'))
+    except Exception:
+        pass
+
+    # Try raw DER decoding
+    try:
+        der_bytes = base64.b64decode(base64_data)
+        return x509.load_der_x509_certificate(der_bytes)
+    except Exception as e:
+        raise ValueError(f"Could not load certificate in PEM or DER format: {e}")
+
+
 def validate_keybox_xml(xml_content: str) -> Dict[str, Any]:
     """Main verification validator for Keyboxes."""
     parsed = parse_keybox_xml(xml_content)
@@ -755,7 +788,7 @@ def validate_keybox_xml(xml_content: str) -> Dict[str, Any]:
 
     certs = []
     for pem in cert_pems:
-        certs.append(x509.load_pem_x509_certificate(pem.encode('utf-8')))
+        certs.append(load_cert_robust(pem))
 
     leaf_cert = certs[0]
     serial_number_hex = format(leaf_cert.serial_number, 'x').lower()
@@ -864,10 +897,36 @@ async def update_attestation_status_loop():
 
         await asyncio.sleep(10800) # Every 3 hours
 
+def trim_keyboxes_collection(max_keep: int = 20):
+    """
+    Ensures db.keyboxes contains at most max_keep items (20).
+    VALID keyboxes are prioritized for retention over non-VALID keyboxes.
+    Oldest revoked/invalid keyboxes are pruned first.
+    """
+    try:
+        total = db.keyboxes.count_documents({})
+        if total > max_keep:
+            all_docs = list(db.keyboxes.find({}, {"_id": 1, "status": 1, "created_at": 1}))
+            # Sort for deletion priority:
+            # Non-VALID keyboxes come first (0) -> pruned first by oldest created_at
+            # VALID keyboxes come next (1) -> retained as long as possible
+            all_docs.sort(key=lambda d: (
+                1 if d.get("status") == "VALID" else 0,
+                d.get("created_at") or ""
+            ))
+            # Delete the excess items from the beginning of the prioritized list
+            docs_to_delete = all_docs[:(total - max_keep)]
+            ids_to_delete = [doc["_id"] for doc in docs_to_delete]
+            if ids_to_delete:
+                db.keyboxes.delete_many({"_id": {"$in": ids_to_delete}})
+    except Exception as e:
+        logger.error(f"Error trimming keyboxes collection: {e}")
+
+
 async def verify_stored_keyboxes_loop():
-    """Background periodic checker that validates stored keyboxes and deletes invalid/revoked ones."""
+    """Background periodic checker that re-validates stored keyboxes and updates status (Max 20 retained, VALID prioritized)."""
     logger.info("Background stored keybox verification loop started.")
-    await asyncio.sleep(60) # Wait 1 minute after start to let database init fully
+    await asyncio.sleep(60)
 
     while True:
         try:
@@ -882,32 +941,489 @@ async def verify_stored_keyboxes_loop():
 
                     try:
                         res = validate_keybox_xml(xml_content)
-                        # Check validation flags
                         is_valid = (
                             res['certValid'] and
                             (not res['revoked']) and
                             res['chainValid'] and
                             (res['privateKeyMatch'] is not False)
                         )
-                        if not is_valid:
-                            logger.warning(f"Keybox with serial {serial_number} is no longer valid. Deleting from database...")
-                            db.keyboxes.delete_one({'serial_number': serial_number})
-                        else:
-                            dhaka_tz = datetime.timezone(datetime.timedelta(hours=6))
-                            now_str = datetime.datetime.now(dhaka_tz).isoformat()
-                            db.keyboxes.update_one(
-                                {'serial_number': serial_number},
-                                {'$set': {'last_checked_at': now_str}}
-                            )
+                        status_str = "VALID" if is_valid else ("REVOKED" if res.get('revoked') else "INVALID")
+                        dhaka_tz = datetime.timezone(datetime.timedelta(hours=6))
+                        now_str = datetime.datetime.now(dhaka_tz).isoformat()
+                        db.keyboxes.update_one(
+                            {'serial_number': serial_number},
+                            {'$set': {'last_checked_at': now_str, 'status': status_str}}
+                        )
                     except Exception as ve:
-                        logger.error(f"Keybox parser failed for stored keybox {serial_number} during periodic verification: {ve}. Deleting...")
-                        db.keyboxes.delete_one({'serial_number': serial_number})
+                        logger.error(f"Keybox parser failed for stored keybox {serial_number} during periodic verification: {ve}")
+                trim_keyboxes_collection(20)
             else:
                 logger.debug("No stored keyboxes to verify in pool.")
         except Exception as e:
             logger.error(f"Error in keybox re-verification loop: {e}")
 
-        await asyncio.sleep(3600) # Every 1 hour
+        await asyncio.sleep(3600)
+
+
+async def background_telegram_scraper_loop():
+    """
+    Background task that monitors Telegram channels and automatically scrapes them when their configured interval is due.
+    """
+    logger.info("Background Telegram Keybox Scraper loop started.")
+    await asyncio.sleep(15)
+
+    while True:
+        try:
+            config_doc = db.scraper_config.find_one({"type": "keybox_scraper"}) or {}
+            saved_channels = config_doc.get("channels") or [{"handle": "@blacktapecollection", "limit": 50, "interval": 2.0}]
+
+            dhaka_tz = datetime.timezone(datetime.timedelta(hours=6))
+            now_dt = datetime.datetime.now(dhaka_tz)
+            due_channels = []
+
+            for sc in saved_channels:
+                d_name, norm, lim, inv, last_scraped = parse_channel_config(sc)
+                if not norm:
+                    continue
+
+                is_due = True
+                if last_scraped:
+                    try:
+                        last_dt = datetime.datetime.fromisoformat(last_scraped)
+                        elapsed_hours = (now_dt - last_dt).total_seconds() / 3600.0
+                        if elapsed_hours < inv:
+                            is_due = False
+                    except Exception:
+                        is_due = True
+
+                if is_due:
+                    due_channels.append({"handle": d_name, "limit": lim, "interval": inv})
+
+            if due_channels:
+                logger.info(f"Running automated background Telegram Keybox Scraper for {len(due_channels)} due channel(s)...")
+                results = await run_telegram_keybox_scraper(due_channels)
+
+                now_str = now_dt.isoformat()
+                
+                # Update last_scraped_at for due channels
+                updated_channels = []
+                for sc in saved_channels:
+                    d_name, norm, lim, inv, last_scraped = parse_channel_config(sc)
+                    if norm and any(parse_channel_config(dc)[1] == norm for dc in due_channels):
+                        updated_channels.append({
+                            "handle": d_name,
+                            "limit": lim,
+                            "interval": inv,
+                            "last_scraped_at": now_str
+                        })
+                    else:
+                        updated_channels.append(sc)
+
+                db.scraper_config.update_one(
+                    {"type": "keybox_scraper"},
+                    {"$set": {
+                        "type": "keybox_scraper",
+                        "channels": updated_channels,
+                        "last_run_at": now_str,
+                        "last_results": results
+                    }},
+                    upsert=True
+                )
+                logger.info("Automated background Telegram Keybox Scraper run completed successfully.")
+        except Exception as e:
+            logger.error(f"Error in background Telegram Keybox Scraper loop: {e}")
+
+        # Check schedule every 60 seconds
+        await asyncio.sleep(60)
+
+
+# ==========================================
+# 4.6 TELEGRAM KEYBOX SCRAPER ENGINE
+# ==========================================
+class KeyboxScrapeRequest(BaseModel):
+    channels: Optional[List[Any]] = None
+    channel_limits: Optional[Dict[str, int]] = None
+    limit_per_channel: Optional[int] = 50
+
+class KeyboxScraperConfig(BaseModel):
+    channels: List[Any]
+    channel_limits: Optional[Dict[str, int]] = None
+
+
+def get_telegram_credentials_from_db() -> Dict[str, Optional[str]]:
+    """
+    Dynamically retrieves Telegram API credentials (api_id, api_hash, session_string)
+    from environment variables or from MongoDB databases (e.g. 'mltb', 'alive_manager')
+    without exposing sensitive values.
+    """
+    api_id = os.environ.get("TELEGRAM_API_ID") or os.environ.get("TELEGRAM_API")
+    api_hash = os.environ.get("TELEGRAM_API_HASH") or os.environ.get("TELEGRAM_HASH")
+    session_string = os.environ.get("TELEGRAM_SESSION_STRING") or os.environ.get("USER_SESSION_STRING")
+
+    if api_id and api_hash and session_string:
+        return {
+            "api_id": str(api_id).strip(),
+            "api_hash": str(api_hash).strip(),
+            "session_string": str(session_string).strip().strip("'").strip('"')
+        }
+
+    # Search MongoDB databases for credentials (e.g. 'mltb' database settings.config)
+    db_candidates = ["mltb", DB_NAME, "alive_manager"]
+    coll_candidates = ["settings.config", "settings.deployConfig", "config", "settings", "scraper_config"]
+
+    for db_name in db_candidates:
+        try:
+            target_db = client[db_name]
+            for coll_name in coll_candidates:
+                try:
+                    doc = target_db[coll_name].find_one()
+                    if not doc:
+                        continue
+
+                    if not api_id:
+                        for k in ["TELEGRAM_API", "TELEGRAM_API_ID", "api_id", "apiId", "API_ID"]:
+                            if doc.get(k):
+                                api_id = str(doc.get(k)).strip()
+                                break
+
+                    if not api_hash:
+                        for k in ["TELEGRAM_HASH", "TELEGRAM_API_HASH", "api_hash", "apiHash", "API_HASH"]:
+                            if doc.get(k):
+                                api_hash = str(doc.get(k)).strip()
+                                break
+
+                    if not session_string:
+                        for k in ["USER_SESSION_STRING", "TELEGRAM_SESSION_STRING", "session_string", "STRING_SESSION", "user_session"]:
+                            if doc.get(k):
+                                session_string = str(doc.get(k)).strip().strip("'").strip('"')
+                                break
+
+                    if api_id and api_hash and session_string:
+                        logger.info(f"Dynamically retrieved Telegram credentials from database ({db_name}.{coll_name}).")
+                        return {
+                            "api_id": str(api_id).strip(),
+                            "api_hash": str(api_hash).strip(),
+                            "session_string": str(session_string).strip()
+                        }
+                except Exception:
+                    continue
+        except Exception:
+            continue
+
+    return {
+        "api_id": str(api_id).strip() if api_id else None,
+        "api_hash": str(api_hash).strip() if api_hash else None,
+        "session_string": str(session_string).strip() if session_string else None
+    }
+
+
+def normalize_channel_target(channel_input: str) -> Union[str, int]:
+    """Normalizes Telegram channel inputs into handles (@name) or integer IDs."""
+    ch_clean = str(channel_input).strip()
+    if not ch_clean:
+        return ""
+    if ch_clean.startswith("https://t.me/"):
+        ch_clean = ch_clean.replace("https://t.me/", "")
+    if ch_clean.startswith("t.me/"):
+        ch_clean = ch_clean.replace("t.me/", "")
+    if ch_clean.startswith("s/"):
+        ch_clean = ch_clean.replace("s/", "")
+
+    # Handle numeric chat IDs
+    if ch_clean.lstrip("-").isdigit():
+        try:
+            return int(ch_clean)
+        except ValueError:
+            pass
+
+    if not ch_clean.startswith("@") and not ch_clean.startswith("+"):
+        ch_clean = "@" + ch_clean
+
+    return ch_clean
+
+
+def parse_channel_config(ch_item: Any, channel_limits_map: Optional[Dict[str, int]] = None, default_limit: int = 50, default_interval: float = 2.0) -> Tuple[str, Union[str, int], int, float, Optional[str]]:
+    """
+    Parses channel items into (display_name, target, limit, interval, last_scraped_at).
+    """
+    limit = default_limit
+    interval = default_interval
+    last_scraped_at = None
+    raw_str = ""
+
+    if isinstance(ch_item, dict):
+        raw_str = str(ch_item.get("handle") or ch_item.get("name") or "").strip()
+        if ch_item.get("limit") is not None:
+            try:
+                limit = int(ch_item["limit"])
+            except (ValueError, TypeError):
+                pass
+        if ch_item.get("interval") is not None:
+            try:
+                interval = float(ch_item["interval"])
+            except (ValueError, TypeError):
+                pass
+        last_scraped_at = ch_item.get("last_scraped_at")
+    else:
+        raw_str = str(ch_item).strip()
+        if ":" in raw_str and not raw_str.startswith("http"):
+            parts = raw_str.rsplit(":", 1)
+            if parts[1].isdigit():
+                raw_str = parts[0].strip()
+                limit = int(parts[1])
+
+    norm = normalize_channel_target(raw_str)
+
+    if channel_limits_map and norm:
+        norm_key = str(norm).lower()
+        raw_key = raw_str.lower()
+        if norm_key in channel_limits_map:
+            limit = int(channel_limits_map[norm_key])
+        elif raw_key in channel_limits_map:
+            limit = int(channel_limits_map[raw_key])
+
+    display_name = raw_str if (raw_str.startswith("@") or raw_str.startswith("+")) else (
+        f"@{raw_str}" if isinstance(norm, str) and norm.startswith("@") else str(norm or raw_str)
+    )
+
+    return display_name, norm, limit, interval, last_scraped_at
+
+
+async def run_telegram_keybox_scraper(channel_list: List[Any], channel_limits: Optional[Dict[str, int]] = None, limit_per_channel: int = 50) -> Dict[str, Any]:
+    """
+    Scrapes .xml files from specified Telegram channels using Pyrogram and validates them using validate_keybox_xml().
+    Per-channel message limits can be configured in channel_list items or channel_limits map.
+    """
+    creds = get_telegram_credentials_from_db()
+    api_id = creds.get("api_id")
+    api_hash = creds.get("api_hash")
+    session_string = creds.get("session_string")
+
+    if not api_id or not api_hash or not session_string:
+        raise ValueError("Telegram credentials (API ID, API Hash, Session String) were not found in environment or database.")
+
+    try:
+        from pyrogram import Client as PyrogramClient
+    except ImportError:
+        raise ValueError("'pyrogram' is not installed. Please install it using: pip install pyrogram")
+
+    cleaned_targets: List[Tuple[str, Union[str, int], int]] = []
+    for ch in channel_list:
+        disp_name, norm, ch_lim, _, _ = parse_channel_config(ch, channel_limits_map=channel_limits, default_limit=limit_per_channel)
+        if norm and not any(t[1] == norm for t in cleaned_targets):
+            cleaned_targets.append((disp_name, norm, ch_lim))
+
+    if not cleaned_targets:
+        raise ValueError("No valid Telegram channel handles or IDs provided.")
+
+    by_channel = {
+        disp: {
+            "scraped_files": 0,
+            "valid_found": 0,
+            "saved_to_db": 0,
+            "revoked_or_invalid": 0,
+            "skipped_existing": 0,
+            "status": "completed",
+            "error": None
+        }
+        for disp, _, _ in cleaned_targets
+    }
+
+    stats = {
+        "scraped_files": 0,
+        "valid_found": 0,
+        "saved_to_db": 0,
+        "revoked_or_invalid": 0,
+        "skipped_existing": 0,
+        "details": [],
+        "by_channel": by_channel
+    }
+
+    clean_session = str(session_string).strip().strip("'").strip('"')
+
+    # Silence verbose Pyrogram logs
+    import logging
+    logging.getLogger("pyrogram").setLevel(logging.WARNING)
+
+    logger.info(f"Starting Telegram .xml scraper for {len(cleaned_targets)} channel(s) via Pyrogram session...")
+
+    app = PyrogramClient(
+        "keybox_pyrogram_scraper",
+        api_id=int(api_id),
+        api_hash=api_hash,
+        session_string=clean_session,
+        no_updates=True,
+        in_memory=True
+    )
+
+    try:
+        await app.start()
+    except Exception as se:
+        logger.error(f"Failed to start Pyrogram client: {se}")
+        raise ValueError(f"Failed to initialize Pyrogram session: {se}")
+
+    try:
+        dhaka_tz = datetime.timezone(datetime.timedelta(hours=6))
+        now_str = datetime.datetime.now(dhaka_tz).isoformat()
+
+        for disp_name, target, chan_limit in cleaned_targets:
+            logger.info(f"Scanning channel: {disp_name} (target: {target}, limit: {chan_limit})...")
+            stats["details"].append({
+                "type": "info",
+                "text": f"Scanning channel {disp_name} (limit: {chan_limit} msgs)..."
+            })
+            found_in_chan = 0
+            try:
+                async for message in app.get_chat_history(target, limit=chan_limit):
+                    if not message.document:
+                        continue
+
+                    doc_name = (message.document.file_name or "").lower()
+                    mime_type = (message.document.mime_type or "").lower()
+
+                    # Check if file has .xml extension or xml mime type
+                    if not (doc_name.endswith(".xml") or mime_type in ["text/xml", "application/xml"]):
+                        continue
+
+                    found_in_chan += 1
+                    # Download .xml file in-memory
+                    try:
+                        file_bytes = await app.download_media(message, in_memory=True)
+                        xml_str = None
+                        if hasattr(file_bytes, "getvalue"):
+                            raw_data = file_bytes.getvalue()
+                            xml_str = raw_data.decode("utf-8", errors="ignore")
+                        elif isinstance(file_bytes, (bytes, bytearray)):
+                            xml_str = file_bytes.decode("utf-8", errors="ignore")
+                        elif isinstance(file_bytes, str) and os.path.exists(file_bytes):
+                            with open(file_bytes, "r", encoding="utf-8", errors="ignore") as f:
+                                xml_str = f.read()
+                            try:
+                                os.remove(file_bytes)
+                            except Exception:
+                                pass
+
+                        if not xml_str or not xml_str.strip():
+                            stats["details"].append({
+                                "type": "error",
+                                "text": f"{disp_name} (Msg #{message.id}): .xml file {doc_name} is empty or unreadable"
+                            })
+                            continue
+
+                        stats["scraped_files"] += 1
+                        if disp_name in by_channel:
+                            by_channel[disp_name]["scraped_files"] += 1
+
+                        # Validate downloaded XML using existing validator method
+                        try:
+                            res = validate_keybox_xml(xml_str)
+                            is_valid = (
+                                res['certValid'] and
+                                (not res['revoked']) and
+                                res['chainValid'] and
+                                (res['privateKeyMatch'] is not False)
+                            )
+                            serial = res.get('serialNumber') or f"unknown_{message.id}"
+                            status_str = "VALID" if is_valid else ("REVOKED" if res.get('revoked') else "INVALID")
+
+                            existing = db.keyboxes.find_one({"serial_number": serial})
+                            db.keyboxes.update_one(
+                                {"serial_number": serial},
+                                {"$set": {
+                                    "device_id": res.get('deviceId', 'Unknown'),
+                                    "serial_number": serial,
+                                    "algorithm": res.get('algorithm', 'RSA/ECDSA'),
+                                    "root_type": res.get('rootType', 'Attestation Root'),
+                                    "xml_content": xml_str,
+                                    "created_at": now_str,
+                                    "last_checked_at": now_str,
+                                    "status": status_str,
+                                    "source": f"Telegram ({disp_name})",
+                                    "source_channel": disp_name
+                                }},
+                                upsert=True
+                            )
+
+                            trim_keyboxes_collection(20)
+
+                            log_type = "valid" if is_valid else ("revoked" if res.get('revoked') else "invalid")
+                            reason = ""
+                            if not is_valid:
+                                if res.get('revoked'):
+                                    reason = " [Google Revoked]"
+                                elif not res.get('certValid'):
+                                    reason = " [Cert Invalid]"
+                                elif not res.get('chainValid'):
+                                    reason = " [Chain Invalid]"
+                                elif res.get('privateKeyMatch') is False:
+                                    reason = " [Private Key Mismatch]"
+
+                            if is_valid:
+                                stats["valid_found"] += 1
+                                if disp_name in by_channel:
+                                    by_channel[disp_name]["valid_found"] += 1
+                            else:
+                                stats["revoked_or_invalid"] += 1
+                                if disp_name in by_channel:
+                                    by_channel[disp_name]["revoked_or_invalid"] += 1
+
+                            if existing:
+                                stats["skipped_existing"] += 1
+                                if disp_name in by_channel:
+                                    by_channel[disp_name]["skipped_existing"] += 1
+                                stats["details"].append({
+                                    "type": log_type,
+                                    "text": f"{disp_name} (Msg #{message.id}): {doc_name} (SN: {serial}) -> {status_str}{reason} (Updated in DB)"
+                                })
+                            else:
+                                stats["saved_to_db"] += 1
+                                if disp_name in by_channel:
+                                    by_channel[disp_name]["saved_to_db"] += 1
+                                stats["details"].append({
+                                    "type": log_type,
+                                    "text": f"{disp_name} (Msg #{message.id}): {doc_name} (SN: {serial}) -> {status_str}{reason} (Saved to DB Pool)"
+                                })
+
+                        except Exception as ve:
+                            stats["revoked_or_invalid"] += 1
+                            if disp_name in by_channel:
+                                by_channel[disp_name]["revoked_or_invalid"] += 1
+                            stats["details"].append({
+                                "type": "error",
+                                "text": f"{disp_name} (Msg #{message.id}): {doc_name} parse/validation error ({str(ve)})"
+                            })
+
+                    except Exception as de:
+                        logger.error(f"Error downloading document {doc_name} from msg {message.id} in {disp_name}: {de}")
+                        stats["details"].append({
+                            "type": "error",
+                            "text": f"{disp_name} (Msg #{message.id}): Download error for {doc_name} ({de})"
+                        })
+
+                if found_in_chan == 0:
+                    stats["details"].append({
+                        "type": "info",
+                        "text": f"{disp_name}: No .xml files found in the last {chan_limit} messages."
+                    })
+
+            except Exception as che:
+                logger.error(f"Error scraping channel {disp_name} via Pyrogram: {che}")
+                if disp_name in by_channel:
+                    by_channel[disp_name]["status"] = "error"
+                    by_channel[disp_name]["error"] = str(che)
+                stats["details"].append({
+                    "type": "error",
+                    "text": f"Error accessing channel {disp_name}: {che}"
+                })
+
+    finally:
+        try:
+            await app.stop()
+        except Exception:
+            pass
+
+    return stats
+
 
 
 # ==========================================
@@ -929,6 +1445,9 @@ async def lifespan(app: FastAPI):
 
     logger.info("Starting background keybox validator loop...")
     asyncio.create_task(verify_stored_keyboxes_loop())
+
+    logger.info("Starting background Telegram Keybox Scraper loop (runs every 2 hours)...")
+    asyncio.create_task(background_telegram_scraper_loop())
     yield
 
 app = FastAPI(title="Keep-Alive Manager API", version="1.0.0", lifespan=lifespan)
@@ -1431,7 +1950,7 @@ class KeyboxCheckRequest(BaseModel):
 
 @app.post("/api/keybox/check")
 def api_check_keybox(req: KeyboxCheckRequest):
-    """Parses and checks an Android Keybox XML, saving it if it is valid."""
+    """Parses and checks an Android Keybox XML, saving it to database (Max 10 recent entries)."""
     try:
         res = validate_keybox_xml(req.xml_content)
         # Check if valid
@@ -1441,29 +1960,31 @@ def api_check_keybox(req: KeyboxCheckRequest):
             res['chainValid'] and
             (res['privateKeyMatch'] is not False)
         )
+        status_str = "VALID" if is_valid else ("REVOKED" if res.get('revoked') else "INVALID")
         saved = False
-        if is_valid:
-            try:
-                dhaka_tz = datetime.timezone(datetime.timedelta(hours=6))
-                now_str = datetime.datetime.now(dhaka_tz).isoformat()
-                # Upsert into database
-                db.keyboxes.update_one(
-                    {"serial_number": res['serialNumber']},
-                    {"$set": {
-                        "device_id": res['deviceId'],
-                        "serial_number": res['serialNumber'],
-                        "algorithm": res['algorithm'],
-                        "root_type": res['rootType'],
-                        "xml_content": req.xml_content,
-                        "created_at": now_str,
-                        "last_checked_at": now_str,
-                        "status": "VALID"
-                    }},
-                    upsert=True
-                )
-                saved = True
-            except Exception as dbe:
-                logger.error(f"Failed to save valid keybox to database: {dbe}")
+        try:
+            dhaka_tz = datetime.timezone(datetime.timedelta(hours=6))
+            now_str = datetime.datetime.now(dhaka_tz).isoformat()
+            serial = res.get('serialNumber') or f"unknown_{hash(req.xml_content)}"
+            # Upsert into database (no duplicates allowed)
+            db.keyboxes.update_one(
+                {"serial_number": serial},
+                {"$set": {
+                    "device_id": res.get('deviceId', 'Unknown'),
+                    "serial_number": serial,
+                    "algorithm": res.get('algorithm', 'RSA/ECDSA'),
+                    "root_type": res.get('rootType', 'Attestation Root'),
+                    "xml_content": req.xml_content,
+                    "created_at": now_str,
+                    "last_checked_at": now_str,
+                    "status": status_str
+                }},
+                upsert=True
+            )
+            trim_keyboxes_collection(20)
+            saved = True
+        except Exception as dbe:
+            logger.error(f"Failed to save keybox to database: {dbe}")
                 
         return {
             "success": is_valid,
@@ -1476,10 +1997,17 @@ def api_check_keybox(req: KeyboxCheckRequest):
 
 @app.get("/api/keyboxes")
 def api_get_keyboxes():
-    """Retrieve all stored valid keyboxes."""
+    """Retrieve up to 20 keyboxes, with VALID keyboxes sorted on top."""
     try:
-        kbs = list(db.keyboxes.find().sort("created_at", -1))
-        return [serialize_doc(kb) for kb in kbs]
+        kbs = list(db.keyboxes.find())
+        valid_kbs = [kb for kb in kbs if kb.get("status") == "VALID"]
+        other_kbs = [kb for kb in kbs if kb.get("status") != "VALID"]
+
+        valid_kbs.sort(key=lambda x: x.get("created_at") or "", reverse=True)
+        other_kbs.sort(key=lambda x: x.get("created_at") or "", reverse=True)
+
+        sorted_kbs = (valid_kbs + other_kbs)[:20]
+        return [serialize_doc(kb) for kb in sorted_kbs]
     except Exception as e:
         logger.error(f"Error fetching keyboxes: {e}")
         raise HTTPException(status_code=500, detail="Internal server error fetching keyboxes")
@@ -1496,6 +2024,122 @@ def api_delete_keybox(serial_number: str):
         raise
     except Exception as e:
         logger.error(f"Error deleting keybox: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/keybox/scraper/run")
+async def api_run_keybox_scraper(req: KeyboxScrapeRequest):
+    """Scrapes keybox XML files from specified Telegram channels with per-channel limits and intervals."""
+    try:
+        config_doc = db.scraper_config.find_one({"type": "keybox_scraper"}) or {}
+        saved_channels = config_doc.get("channels") or [{"handle": "@blacktapecollection", "limit": 50, "interval": 2.0}]
+
+        channels = req.channels
+        if not channels:
+            channels = saved_channels
+
+        limit = req.limit_per_channel if req.limit_per_channel else 50
+        results = await run_telegram_keybox_scraper(channels, channel_limits=req.channel_limits, limit_per_channel=limit)
+
+        now_str = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=6))).isoformat()
+
+        # Build updated channels map preserving existing limits, intervals, and last_scraped_at
+        updated_channels_map = {}
+        for sc in saved_channels:
+            d_name, norm, lim, inv, last_sc = parse_channel_config(sc, default_limit=50, default_interval=2.0)
+            if norm:
+                updated_channels_map[str(norm).lower()] = {
+                    "handle": d_name,
+                    "limit": lim,
+                    "interval": inv,
+                    "last_scraped_at": last_sc
+                }
+
+        for ch in channels:
+            d_name, norm, lim, inv, _ = parse_channel_config(ch, channel_limits_map=req.channel_limits, default_limit=limit)
+            if norm:
+                norm_key = str(norm).lower()
+                if norm_key in updated_channels_map:
+                    if isinstance(ch, dict):
+                        if "limit" in ch:
+                            updated_channels_map[norm_key]["limit"] = lim
+                        if "interval" in ch:
+                            updated_channels_map[norm_key]["interval"] = inv
+                    updated_channels_map[norm_key]["last_scraped_at"] = now_str
+                else:
+                    updated_channels_map[norm_key] = {
+                        "handle": d_name,
+                        "limit": lim,
+                        "interval": inv,
+                        "last_scraped_at": now_str
+                    }
+
+        updated_channels = list(updated_channels_map.values())
+
+        db.scraper_config.update_one(
+            {"type": "keybox_scraper"},
+            {"$set": {
+                "type": "keybox_scraper",
+                "channels": updated_channels,
+                "last_run_at": now_str,
+                "last_results": results
+            }},
+            upsert=True
+        )
+        return {"success": True, "results": results}
+    except Exception as e:
+        logger.error(f"Error running Keybox Telegram Scraper: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/keybox/scraper/config")
+def api_get_scraper_config():
+    """Get saved scraper channel configuration and last run results."""
+    try:
+        config = db.scraper_config.find_one({"type": "keybox_scraper"})
+        if not config:
+            return {
+                "channels": [{"handle": "@blacktapecollection", "limit": 50, "interval": 2.0}],
+                "last_run_at": None,
+                "last_results": None
+            }
+        return serialize_doc(config)
+    except Exception as e:
+        logger.error(f"Error fetching scraper config: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/keybox/scraper/config")
+def api_save_scraper_config(cfg: KeyboxScraperConfig):
+    """Save default Telegram channels, limits, and intervals for keybox scraper."""
+    try:
+        config_doc = db.scraper_config.find_one({"type": "keybox_scraper"}) or {}
+        existing_channels = {}
+        for sc in (config_doc.get("channels") or []):
+            d_name, norm, lim, inv, last_sc = parse_channel_config(sc)
+            if norm:
+                existing_channels[str(norm).lower()] = last_sc
+
+        updated_channels = []
+        for ch in cfg.channels:
+            d_name, norm, lim, inv, _ = parse_channel_config(ch, channel_limits_map=cfg.channel_limits, default_limit=50)
+            if norm:
+                norm_key = str(norm).lower()
+                last_sc = existing_channels.get(norm_key)
+                item = {"handle": d_name, "limit": lim, "interval": inv}
+                if last_sc:
+                    item["last_scraped_at"] = last_sc
+                updated_channels.append(item)
+
+        db.scraper_config.update_one(
+            {"type": "keybox_scraper"},
+            {"$set": {
+                "type": "keybox_scraper",
+                "channels": updated_channels
+            }},
+            upsert=True
+        )
+        return {"success": True, "message": "Scraper configuration saved."}
+    except Exception as e:
+        logger.error(f"Error saving scraper config: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

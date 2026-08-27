@@ -4370,3 +4370,865 @@ html.light-theme .input-method-selector {
   font-family: var(--font-mono);
   font-size: 10px;
 }
+
+/* ==========================================
+   ONE-PAGE PC LAYOUT & TELEGRAM SCRAPER STYLES
+   ========================================== */
+
+@media (min-width: 992px) {
+  body {
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .app-container {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .tab-content:not([style*="display: none"]) {
+    display: flex !important;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .keybox-tab-wrapper {
+    height: calc(100vh - 80px);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px 24px;
+    overflow: hidden;
+  }
+
+  .keybox-dashboard-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    min-height: 0;
+  }
+
+  .verifier-card,
+  .keybox-pool-panel {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .pool-grid {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+}
+
+/* Telegram Scraper Launcher Button */
+.btn-telegram-launcher {
+  background: linear-gradient(135deg, rgba(0, 136, 204, 0.2), rgba(0, 85, 136, 0.3));
+  color: #0088cc;
+  border: 1px solid rgba(0, 136, 204, 0.4);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.25s ease;
+}
+
+.btn-telegram-launcher:hover {
+  background: linear-gradient(135deg, #0088cc, #005588);
+  color: #ffffff;
+  border-color: #0088cc;
+  box-shadow: 0 4px 16px rgba(0, 136, 204, 0.4);
+  transform: translateY(-1px);
+}
+
+.launcher-badge {
+  background: rgba(0, 136, 204, 0.3);
+  color: #fff;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.btn-telegram-launcher:hover .launcher-badge {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Scraper Floating Modal Window */
+.scraper-floating-modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(8, 10, 18, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.scraper-floating-modal.active {
+  display: flex;
+}
+
+.scraper-modal-window {
+  width: 92%;
+  max-width: 1050px;
+  max-height: 88vh;
+  background: rgba(16, 20, 32, 0.85);
+  border: 1px solid rgba(0, 136, 204, 0.3);
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 30px rgba(0, 136, 204, 0.15);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.scraper-modal-header {
+  padding: 18px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.scraper-modal-body {
+  padding: 20px 24px;
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Telegram Scraper Glassmorphic Card */
+.telegram-scraper-card {
+  border-radius: 16px;
+  padding: 16px 20px;
+  background: var(--glass-bg, rgba(18, 20, 32, 0.55));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.3s ease;
+}
+
+.telegram-scraper-card:hover {
+  border-color: rgba(0, 136, 204, 0.35);
+  box-shadow: 0 12px 40px rgba(0, 136, 204, 0.15);
+}
+
+.scraper-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.scraper-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.telegram-icon-badge {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #0088cc, #005588);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(0, 136, 204, 0.4);
+}
+
+.scraper-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-main, #ffffff);
+  margin: 0;
+}
+
+.scraper-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-muted, rgba(255, 255, 255, 0.6));
+  margin: 0;
+}
+
+.scraper-stats-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.scraper-stat-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.8rem;
+}
+
+.scraper-stat-pill .stat-num {
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: var(--text-main, #fff);
+}
+
+.scraper-stat-pill .stat-lbl {
+  font-size: 0.72rem;
+  opacity: 0.75;
+}
+
+.scraper-stat-pill.valid {
+  background: rgba(46, 213, 115, 0.1);
+  border-color: rgba(46, 213, 115, 0.25);
+}
+
+.scraper-stat-pill.valid .stat-num {
+  color: #2ed573;
+}
+
+.scraper-stat-pill.saved {
+  background: rgba(30, 144, 255, 0.1);
+  border-color: rgba(30, 144, 255, 0.25);
+}
+
+.scraper-stat-pill.saved .stat-num {
+  color: #1e90ff;
+}
+
+.scraper-stat-pill.revoked {
+  background: rgba(255, 71, 87, 0.1);
+  border-color: rgba(255, 71, 87, 0.25);
+}
+
+.scraper-stat-pill.revoked .stat-num {
+  color: #ff4757;
+}
+
+/* Modern Scraper Control Toolbar & Channel Add Bar */
+.scraper-control-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.scraper-add-bar {
+  flex: 1;
+  min-width: 320px;
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 4px 6px 4px 14px;
+  transition: all 0.25s ease;
+}
+
+.scraper-add-bar:focus-within {
+  border-color: #0088cc;
+  box-shadow: 0 0 0 3px rgba(0, 136, 204, 0.25);
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.input-at-icon {
+  color: #0088cc;
+  font-size: 1rem;
+  margin-right: 8px;
+}
+
+.modern-scraper-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-main, #ffffff);
+  font-size: 0.88rem;
+  font-family: inherit;
+  padding: 8px 0;
+}
+
+.btn-add-channel-action {
+  background: linear-gradient(135deg, #0088cc, #0066a1);
+  color: #ffffff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 9px;
+  font-weight: 700;
+  font-size: 0.83rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 10px rgba(0, 136, 204, 0.35);
+  white-space: nowrap;
+}
+
+.btn-add-channel-action:hover {
+  background: linear-gradient(135deg, #0099ee, #0077b6);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0, 136, 204, 0.5);
+}
+
+.scraper-global-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn-save-channels {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-main, #ffffff);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 9px 16px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-save-channels:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.btn-scrape-run {
+  background: linear-gradient(135deg, #0088cc, #005588);
+  color: #ffffff;
+  border: none;
+  padding: 9px 18px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 0.86rem;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(0, 136, 204, 0.35);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-scrape-run:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(0, 136, 204, 0.5);
+}
+
+.scraper-presets-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.presets-label {
+  font-size: 0.76rem;
+  color: var(--text-muted, rgba(255, 255, 255, 0.55));
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.quick-chip-btn {
+  background: rgba(0, 136, 204, 0.12);
+  color: #0088cc;
+  border: 1px solid rgba(0, 136, 204, 0.25);
+  padding: 4px 11px;
+  border-radius: 14px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.quick-chip-btn:hover {
+  background: #0088cc;
+  color: #fff;
+}
+
+
+
+/* Multi-Channel Scraper Grid & Live Counters */
+.scraper-channels-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: 14px;
+}
+
+.channel-card {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.25s ease;
+  position: relative;
+}
+
+.channel-card:hover {
+  border-color: rgba(0, 136, 204, 0.35);
+  background: rgba(0, 0, 0, 0.35);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+}
+
+.channel-card.is-scraping {
+  border-color: #0088cc;
+  box-shadow: 0 0 16px rgba(0, 136, 204, 0.3);
+  background: rgba(0, 136, 204, 0.05);
+}
+
+.channel-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.channel-handle-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.channel-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: rgba(0, 136, 204, 0.15);
+  border: 1px solid rgba(0, 136, 204, 0.25);
+  color: #0088cc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+}
+
+.channel-handle {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-main, #ffffff);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.channel-handle:hover {
+  color: #0088cc;
+}
+
+.channel-status-badge {
+  font-size: 0.7rem;
+  padding: 3px 9px;
+  border-radius: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted, rgba(255, 255, 255, 0.6));
+}
+
+.channel-status-badge.scraping {
+  background: rgba(0, 136, 204, 0.25);
+  color: #0088cc;
+  border: 1px solid rgba(0, 136, 204, 0.4);
+}
+
+.channel-status-badge.completed {
+  background: rgba(46, 213, 115, 0.15);
+  color: #2ed573;
+  border: 1px solid rgba(46, 213, 115, 0.3);
+}
+
+.channel-status-badge.error {
+  background: rgba(255, 71, 87, 0.15);
+  color: #ff4757;
+  border: 1px solid rgba(255, 71, 87, 0.3);
+}
+
+.channel-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-icon-subtle {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-muted, rgba(255, 255, 255, 0.7));
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.78rem;
+  transition: all 0.2s ease;
+}
+
+.btn-icon-subtle:hover {
+  background: rgba(255, 71, 87, 0.2);
+  color: #ff4757;
+  border-color: rgba(255, 71, 87, 0.4);
+}
+
+.btn-icon-scrape {
+  background: rgba(0, 136, 204, 0.15);
+  border: 1px solid rgba(0, 136, 204, 0.3);
+  color: #0088cc;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.78rem;
+  transition: all 0.2s ease;
+}
+
+.btn-icon-scrape:hover {
+  background: #0088cc;
+  color: #ffffff;
+  box-shadow: 0 2px 10px rgba(0, 136, 204, 0.4);
+}
+
+.channel-counters-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.22);
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.counter-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.counter-val {
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--text-main, #ffffff);
+  line-height: 1.25;
+}
+
+.counter-val.valid {
+  color: #2ed573;
+}
+
+.counter-val.saved {
+  color: #1e90ff;
+}
+
+.counter-val.revoked {
+  color: #ff4757;
+}
+
+.counter-lbl {
+  font-size: 0.68rem;
+  color: var(--text-muted, rgba(255, 255, 255, 0.55));
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
+.channel-empty-state {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 30px 20px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  color: var(--text-muted, rgba(255, 255, 255, 0.6));
+  font-size: 0.88rem;
+}
+
+.channel-limit-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 10px;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  font-size: 0.76rem;
+  color: var(--text-muted, rgba(255, 255, 255, 0.7));
+}
+
+.channel-limit-input {
+  width: 60px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  border-radius: 6px;
+  padding: 3px 6px;
+  font-size: 0.78rem;
+  text-align: center;
+  font-weight: 700;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.channel-limit-input:focus {
+  border-color: #0088cc;
+  box-shadow: 0 0 0 2px rgba(0, 136, 204, 0.25);
+}
+
+/* ==========================================
+ * TELEGRAM SCRAPER - LIGHT THEME OVERRIDES
+ * ========================================== */
+html.light-theme .scraper-modal-window {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.12);
+  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.18), 0 0 30px rgba(0, 136, 204, 0.08);
+}
+
+html.light-theme .scraper-modal-header {
+  background: #f8fafc;
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+
+html.light-theme .scraper-title {
+  color: #0f172a;
+}
+
+html.light-theme .scraper-subtitle {
+  color: #64748b;
+}
+
+html.light-theme .scraper-stat-pill {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+html.light-theme .scraper-stat-pill .stat-num {
+  color: #0f172a;
+}
+
+html.light-theme .scraper-stat-pill .stat-lbl {
+  color: #64748b;
+}
+
+html.light-theme .scraper-add-bar {
+  background: #f1f5f9;
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+html.light-theme .scraper-add-bar:focus-within {
+  background: #ffffff;
+  border-color: #0088cc;
+  box-shadow: 0 0 0 3px rgba(0, 136, 204, 0.18);
+}
+
+html.light-theme .modern-scraper-input {
+  color: #0f172a;
+}
+
+html.light-theme .modern-scraper-input::placeholder {
+  color: #94a3b8;
+}
+
+html.light-theme .btn-save-channels {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+html.light-theme .btn-save-channels:hover {
+  background: #e2e8f0;
+}
+
+html.light-theme .quick-chip-btn {
+  background: rgba(0, 136, 204, 0.08);
+  color: #0077b6;
+  border-color: rgba(0, 136, 204, 0.25);
+}
+
+html.light-theme .quick-chip-btn:hover {
+  background: #0088cc;
+  color: #ffffff;
+}
+
+html.light-theme .channel-card {
+  background: #f8fafc;
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+}
+
+html.light-theme .channel-card:hover {
+  background: #ffffff;
+  border-color: rgba(0, 136, 204, 0.4);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+html.light-theme .channel-card.is-scraping {
+  background: rgba(0, 136, 204, 0.04);
+  border-color: #0088cc;
+}
+
+html.light-theme .channel-handle {
+  color: #0f172a;
+}
+
+html.light-theme .channel-status-badge {
+  background: rgba(0, 0, 0, 0.06);
+  color: #64748b;
+}
+
+html.light-theme .btn-icon-subtle {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #64748b;
+}
+
+html.light-theme .btn-icon-subtle:hover {
+  background: rgba(255, 71, 87, 0.12);
+  color: #ff4757;
+  border-color: rgba(255, 71, 87, 0.3);
+}
+
+html.light-theme .channel-counters-grid {
+  background: #f1f5f9;
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+html.light-theme .counter-val {
+  color: #0f172a;
+}
+
+html.light-theme .counter-lbl {
+  color: #64748b;
+}
+
+html.light-theme .channel-limit-bar {
+  background: #f1f5f9;
+  border-color: rgba(0, 0, 0, 0.06);
+  color: #64748b;
+}
+
+html.light-theme .channel-limit-input {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.18);
+  color: #0f172a;
+}
+
+html.light-theme .channel-limit-input:focus {
+  background: #ffffff;
+  border-color: #0088cc;
+  box-shadow: 0 0 0 2px rgba(0, 136, 204, 0.2);
+}
+
+html.light-theme .channel-empty-state {
+  background: #f8fafc;
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #64748b;
+}
+
+/* Scraper Activity Log Console */
+.scraper-log-console {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 10px 14px;
+  max-height: 180px;
+  overflow-y: auto;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+html.light-theme .scraper-log-console {
+  background: #f8fafc;
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #1e293b;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.log-entries-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.log-entry {
+  word-break: break-word;
+  color: var(--text-main, #e2e8f0);
+}
+
+.log-entry.info { color: #38bdf8; }
+.log-entry.valid { color: #4ade80; font-weight: 600; }
+.log-entry.revoked { color: #f87171; font-weight: 600; }
+.log-entry.invalid { color: #fbbf24; }
+.log-entry.error { color: #f87171; }
+
+.log-entry .log-tag {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  margin-right: 6px;
+  letter-spacing: 0.5px;
+}
+
+.log-tag.info { background: rgba(56, 189, 248, 0.2); color: #38bdf8; }
+.log-tag.valid { background: rgba(74, 222, 128, 0.2); color: #4ade80; }
+.log-tag.revoked { background: rgba(248, 113, 113, 0.2); color: #f87171; }
+.log-tag.invalid { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+.log-tag.error { background: rgba(248, 113, 113, 0.2); color: #f87171; }
+
+.btn-clear-logs {
+  background: transparent;
+  border: none;
+  color: var(--text-muted, #94a3b8);
+  font-size: 0.75rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 0.2s ease;
+}
+
+.btn-clear-logs:hover {
+  color: #ff4757;
+}
