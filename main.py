@@ -5,6 +5,7 @@ import datetime
 import time
 import logging
 import json
+import gc
 from contextlib import asynccontextmanager
 from typing import Dict, Any, Optional, List
 from dotenv import load_dotenv
@@ -28,7 +29,7 @@ from pymongo import MongoClient, DESCENDING
 # 1. CONFIGURATIONS
 # ==========================================
 load_dotenv()
-MONGO_URI = os.environ.get("MONGO_URI", "mongodb+srv://mltb-2:mltb-2@cluster0.56sdwsb.mongodb.net")
+MONGO_URI = os.environ.get("MONGO_URI") or os.environ.get("MONGODB_URI", "mongodb+srv://mltb-2:mltb-2@cluster0.56sdwsb.mongodb.net")
 DB_NAME = os.environ.get("MONGO_DB_NAME", "alive_manager")
 PREDEFINED_URI = os.environ.get("MONGODB_PREDEFINED_URI", MONGO_URI)
 
@@ -75,7 +76,15 @@ logger = logging.getLogger("keepalive")
 # ==========================================
 # 2. DATABASE LAYER
 # ==========================================
-client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+client = MongoClient(
+    MONGO_URI,
+    serverSelectionTimeoutMS=5000,
+    connectTimeoutMS=5000,
+    socketTimeoutMS=10000,
+    maxPoolSize=10,
+    minPoolSize=1,
+    maxIdleTimeMS=30000
+)
 db = client[DB_NAME]
 
 def serialize_doc(doc):
@@ -99,8 +108,8 @@ def init_db():
         # Enforce unique index on url in targets collection
         db.targets.create_index("url", unique=True)
         # Create helper index for log queries
-        db.ping_logs.create_index("target_id")
-        db.ping_logs.create_index("timestamp")
+        db.ping_logs.create_index([("target_id", 1), ("timestamp", DESCENDING)])
+        db.ping_logs.create_index([("timestamp", DESCENDING)])
         db.targets.create_index("active")
         db.targets.create_index("order")
         
@@ -218,7 +227,7 @@ def update_target_ping_status(target_id: str, status: str, response_time: int, s
         logger.error(f"Error updating target ping status: {e}")
 
 def insert_ping_log(target_id: str, status: str, response_time: int, status_code: int, error_message: str = None):
-    """Inserts a ping response execution log entry and caps logs per target to the last 100."""
+    """Inserts a ping response execution log entry and caps logs globally to the last 100 without loading ID arrays into RAM."""
     try:
         dhaka_tz = datetime.timezone(datetime.timedelta(hours=6))
         timestamp = datetime.datetime.now(dhaka_tz).isoformat()
@@ -232,14 +241,12 @@ def insert_ping_log(target_id: str, status: str, response_time: int, status_code
         }
         db.ping_logs.insert_one(new_log)
         
-        # Keep only the last 100 logs globally in the database
-        excess_logs = list(db.ping_logs.find(
-            {},
-            {"_id": 1}
-        ).sort("timestamp", DESCENDING).skip(100))
-        if excess_logs:
-            excess_ids = [doc["_id"] for doc in excess_logs]
-            db.ping_logs.delete_many({"_id": {"$in": excess_ids}})
+        # Efficiently prune beyond 100 logs by finding the 100th record's timestamp (1 doc only)
+        cutoff_cursor = db.ping_logs.find({}, {"timestamp": 1}).sort("timestamp", DESCENDING).skip(100).limit(1)
+        cutoff_list = list(cutoff_cursor)
+        if cutoff_list:
+            cutoff_ts = cutoff_list[0]["timestamp"]
+            db.ping_logs.delete_many({"timestamp": {"$lte": cutoff_ts}})
     except Exception as e:
         logger.error(f"Error inserting ping log: {e}")
 
@@ -322,10 +329,26 @@ def response_code_is_healthy(status_code: int) -> bool:
     """Classify if the status code is considered healthy/alive."""
     return 100 <= status_code < 500
 
+# Shared HTTP Client with connection pooling and resource limits
+http_client: Optional[httpx.AsyncClient] = None
+
+def get_http_client() -> httpx.AsyncClient:
+    """Returns or initializes the singleton AsyncClient to prevent memory leaks from client churn."""
+    global http_client
+    if http_client is None or http_client.is_closed:
+        limits = httpx.Limits(max_keepalive_connections=5, max_connections=15, keepalive_expiry=30.0)
+        http_client = httpx.AsyncClient(
+            timeout=15.0,
+            follow_redirects=True,
+            limits=limits,
+            verify=False
+        )
+    return http_client
+
 async def perform_ping(target_id: str, url: str) -> Dict[str, Any]:
     """
     Performs an async GET ping request to the specified URL.
-    Measures response time and returns performance parameters.
+    Uses streaming to read only headers and status code without buffering response body into RAM.
     """
     headers = {
         "User-Agent": "KeepAliveManager/1.0 (Web-Keep-Alive-Scheduler; https://github.com/google-deepmind/antigravity)",
@@ -338,11 +361,11 @@ async def perform_ping(target_id: str, url: str) -> Dict[str, Any]:
     response_time_ms = 0
     status_code = 0
     error_msg = None
+    client_instance = get_http_client()
     
     try:
-        # Pinging using httpx AsyncClient
-        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
-            response = await client.get(url, headers=headers)
+        # Stream GET to read status code without downloading response body
+        async with client_instance.stream("GET", url, headers=headers) as response:
             elapsed = time.perf_counter() - start_time
             response_time_ms = int(elapsed * 1000)
             status_code = response.status_code
@@ -410,12 +433,18 @@ async def ping_and_log_target(target: Dict[str, Any]):
         logger.info(f"Target '{name}' ping OK. Status: {result['status']}, Time: {result['response_time_ms']}ms, Code: {result['status_code']}")
 
 async def scheduler_loop():
-    """Infinite background scheduler loop checking for due pings."""
+    """Infinite background scheduler loop checking for due pings with periodic GC."""
     logger.info("Keep-Alive background scheduler loop started.")
     dhaka_tz = datetime.timezone(datetime.timedelta(hours=6))
+    loop_count = 0
     
     while True:
         try:
+            loop_count += 1
+            # Explicit garbage collection every 30 loops (5 minutes) to free unreferenced asyncio frames
+            if loop_count % 30 == 0:
+                gc.collect()
+                
             active_targets = get_active_targets()
             now = datetime.datetime.now(dhaka_tz)
             
@@ -467,15 +496,17 @@ async def self_ping_loop():
     logger.info(f"Self-ping keep-alive loop started for {BASE_URL} (Port: {port}).")
     fail_count = 0
     MAX_RETRIES = 10
+    client_instance = get_http_client()
 
     while fail_count < MAX_RETRIES:
         try:
             await asyncio.sleep(300)  # Ping every 5 minutes (well within Render's 15-min sleep)
-            async with httpx.AsyncClient(timeout=15.0) as http_client:
-                response = await http_client.get(BASE_URL)
-                response.raise_for_status()
-                logger.info(f"Self-ping keep-alive successful (HTTP {response.status_code}).")
-                fail_count = 0  # Reset on success
+            async with client_instance.stream("GET", BASE_URL) as response:
+                if response.status_code < 500:
+                    logger.info(f"Self-ping keep-alive successful (HTTP {response.status_code}).")
+                    fail_count = 0  # Reset on success
+                else:
+                    logger.warning(f"Self-ping returned HTTP status {response.status_code}")
         except Exception as e:
             fail_count += 1
             wait_time = min(60 * fail_count, 300)  # Exponential backoff, max 5 min
@@ -493,12 +524,36 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing database...")
     init_db()
     
+    # Pre-initialize shared HTTP client
+    get_http_client()
+    
     logger.info("Starting background Keep-Alive pinger...")
-    asyncio.create_task(scheduler_loop())
+    scheduler_task = asyncio.create_task(scheduler_loop())
     
     logger.info("Starting background self-ping keep-alive...")
-    asyncio.create_task(self_ping_loop())
-    yield
+    self_ping_task = asyncio.create_task(self_ping_loop())
+    
+    try:
+        yield
+    finally:
+        logger.info("Shutting down background tasks and connection pools...")
+        scheduler_task.cancel()
+        self_ping_task.cancel()
+        
+        global http_client, client, active_client
+        if http_client and not http_client.is_closed:
+            await http_client.aclose()
+        if client:
+            try:
+                client.close()
+            except Exception:
+                pass
+        if active_client:
+            try:
+                active_client.close()
+            except Exception:
+                pass
+        gc.collect()
 
 app = FastAPI(title="Keep-Alive Manager API", version="1.0.0", lifespan=lifespan)
 
@@ -773,23 +828,44 @@ class DeleteDocumentRequest(BaseModel):
 def connect_db(req: ConnectRequest):
     global active_client, active_uri
     try:
-        # Create a client with a 5-second timeout for testing connection immediately
-        client = MongoClient(req.uri, serverSelectionTimeoutMS=5000)
+        # Close previously active client if open to avoid socket/thread leaks
+        if active_client is not None:
+            try:
+                active_client.close()
+            except Exception:
+                pass
+            active_client = None
+
+        # Create client with bounded connection pool and timeouts
+        new_client = MongoClient(
+            req.uri,
+            serverSelectionTimeoutMS=5000,
+            connectTimeoutMS=5000,
+            socketTimeoutMS=10000,
+            maxPoolSize=10,
+            minPoolSize=1,
+            maxIdleTimeMS=30000
+        )
         # Ping the server to trigger connection validation
-        client.admin.command('ping')
+        new_client.admin.command('ping')
         
         # Save successfully connected client
-        active_client = client
+        active_client = new_client
         active_uri = req.uri
         
         # Get initial list of databases
-        dbs = client.list_database_names()
+        dbs = new_client.list_database_names()
         return {
             "status": "success",
             "message": "Successfully connected to MongoDB!",
             "databases": dbs
         }
     except Exception as e:
+        if active_client is not None:
+            try:
+                active_client.close()
+            except Exception:
+                pass
         active_client = None
         active_uri = None
         raise HTTPException(status_code=400, detail=f"Connection failed: {str(e)}")
@@ -888,15 +964,18 @@ def list_documents(req: QueryRequest):
         # Count matching documents
         total_docs = col.count_documents(filter_dict)
         
+        # Cap limit to maximum 100 to prevent excessive memory allocation
+        effective_limit = min(max(req.limit, 1), 100)
+        
         # Prepare pagination & query
-        skip_count = (req.page - 1) * req.limit
+        skip_count = (req.page - 1) * effective_limit
         cursor = col.find(filter_dict)
         
         # Handle sorting
         if req.sort_field and req.sort_field.strip():
             cursor = cursor.sort(req.sort_field, req.sort_order)
             
-        cursor = cursor.skip(skip_count).limit(req.limit)
+        cursor = cursor.skip(skip_count).limit(effective_limit)
         
         documents = list(cursor)
         serialized = [db_serialize_doc(doc) for doc in documents]
@@ -1013,4 +1092,5 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True, access_log=False)
+    reload_enabled = os.environ.get("RELOAD", "false").lower() in ("true", "1", "t")
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=reload_enabled, access_log=False)
