@@ -5,3 +5,5 @@ httpx
 pydantic
 dnspython
 python-dotenv
+cryptography
+kurigram
