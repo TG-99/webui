@@ -368,7 +368,9 @@
       renderKeyboxResults(data.result);
       if (DOM.resultModal) DOM.resultModal.classList.add('active');
 
-      if (data.success) {
+      if (data.is_duplicate) {
+        showToast(`⚠️ Duplicate Keybox: Already present in active pool (${data.status}).`, 'warning');
+      } else if (data.success) {
         showToast('Keybox verified & saved to active pool!', 'success');
       } else {
         showToast('Keybox is INVALID or REVOKED!', 'error');
@@ -418,6 +420,15 @@
       statusSub = res.revokeReason || 'Revoked in Google Attestation CRL status list';
     }
 
+    const duplicateWarningHtml = res.isDuplicate ? `
+      <div class="result-duplicate-warning" style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.45); border-radius: var(--radius-sm); padding: 10px 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; color: #fbbf24;">
+        <i class="fa-solid fa-triangle-exclamation" style="font-size: 1.15rem; flex-shrink: 0;"></i>
+        <div style="font-size: 0.82rem; font-weight: 600; line-height: 1.4;">
+          ${escapeHtml(res.duplicateWarning || 'Duplicate Warning: This keybox is already present in your active database pool. Status has been updated.')}
+        </div>
+      </div>
+    ` : '';
+
     const rootKindTag = (res.rootType === 'rkp') 
       ? '<span class="status-pill strong" style="font-size: 0.7rem; padding: 2px 7px; margin-left: 6px;"><i class="fa-solid fa-cloud-arrow-down"></i> RKP</span>' 
       : (res.rootType === 'hardware') 
@@ -453,6 +464,7 @@
     `).join('');
 
     DOM.resultContainer.innerHTML = `
+      ${duplicateWarningHtml}
       <div class="result-status-banner ${statusClass}">
         <i class="fa-solid ${statusIcon}" style="font-size: 26px;"></i>
         <div>

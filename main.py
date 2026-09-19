@@ -136,7 +136,18 @@ KNOWN_SOFTBANNED_SERIALS = {
 def parse_keybox_xml(xml_content: str) -> Dict[str, Any]:
     """Parses Android keybox XML string, extracting device ID, algorithm, private key and cert chain."""
     try:
-        cleaned_xml = xml_content.strip()
+        cleaned_xml = (xml_content or "").strip()
+        # If input is base64-encoded, auto-decode it
+        if cleaned_xml and not cleaned_xml.startswith("<"):
+            try:
+                stripped = re.sub(r"\s+", "", cleaned_xml)
+                pad = len(stripped) % 4
+                padded = stripped + ("=" * ((4 - pad) % 4))
+                dec = base64.b64decode(padded).decode("utf-8", errors="ignore")
+                if any(k in dec for k in ["<AndroidAttestation", "<Keybox", "<CertificateChain", "<?xml"]):
+                    cleaned_xml = dec.strip()
+            except Exception:
+                pass
         cleaned_xml = re.sub(r"<\?xml.*?\?>", "", cleaned_xml).strip()
         root = ET.fromstring(cleaned_xml)
     except Exception as e:
@@ -856,6 +867,60 @@ async def verify_stored_keyboxes_loop():
         await asyncio.sleep(3600)
 
 # ==========================================
+# 5.1 BASE64 STORAGE & CONVERSION HELPERS
+# ==========================================
+def ensure_base64_xml(content: str) -> str:
+    """Ensures XML content is converted to Base64 string for safe database storage."""
+    if not content or not str(content).strip():
+        return ""
+    raw = str(content).strip()
+    if not raw.startswith("<"):
+        try:
+            stripped = re.sub(r"\s+", "", raw)
+            pad = len(stripped) % 4
+            padded = stripped + ("=" * ((4 - pad) % 4))
+            dec = base64.b64decode(padded).decode("utf-8", errors="ignore")
+            if any(k in dec for k in ["<AndroidAttestation", "<Keybox", "<CertificateChain", "<?xml"]):
+                return stripped
+        except Exception:
+            pass
+    return base64.b64encode(raw.encode("utf-8")).decode("utf-8")
+
+def decode_base64_xml(content: str) -> str:
+    """Decodes Base64 XML string back into standard plaintext XML for client download/viewing."""
+    if not content or not str(content).strip():
+        return ""
+    raw = str(content).strip()
+    if raw.startswith("<"):
+        return raw
+    try:
+        stripped = re.sub(r"\s+", "", raw)
+        pad = len(stripped) % 4
+        padded = stripped + ("=" * ((4 - pad) % 4))
+        decoded = base64.b64decode(padded).decode("utf-8", errors="ignore")
+        if any(k in decoded for k in ["<AndroidAttestation", "<Keybox", "<CertificateChain", "<?xml"]):
+            return decoded
+    except Exception:
+        pass
+    return raw
+
+def migrate_existing_keyboxes_to_base64():
+    """Migrates all stored plaintext XML keyboxes to Base64 encoding in the database."""
+    try:
+        kbs = list(db.keyboxes.find())
+        migrated = 0
+        for kb in kbs:
+            xml_raw = kb.get("xml_content")
+            if xml_raw and str(xml_raw).strip().startswith("<"):
+                b64_val = ensure_base64_xml(xml_raw)
+                db.keyboxes.update_one({"_id": kb["_id"]}, {"$set": {"xml_content": b64_val}})
+                migrated += 1
+        if migrated > 0:
+            logger.info(f"Database Migration: Successfully converted {migrated} keybox(es) to Base64-encoded XML storage.")
+    except Exception as e:
+        logger.error(f"Error during Base64 keybox database migration: {e}")
+
+# ==========================================
 # 6. KEYBOX & SOURCES DATA MODELS
 # ==========================================
 class KeyboxSourcesScrapeRequest(BaseModel):
@@ -892,30 +957,87 @@ def normalize_source_url(url_input: str) -> str:
     return url
 
 def extract_keyboxes_from_raw_content(content: str) -> List[str]:
-    """Extracts AndroidAttestation / Keybox XML strings from raw web page / file content."""
-    if not content or not content.strip():
+    """Extracts AndroidAttestation / Keybox XML strings from raw web page / file content, including Base64-encoded strings and multi-keybox containers."""
+    if not content or not str(content).strip():
         return []
 
+    raw_str = str(content).strip()
+    text_candidates = [raw_str]
+
+    # 1. Check if the entire content is Base64 encoded XML (e.g. evoker.qzz.io/key)
+    stripped = re.sub(r"\s+", "", raw_str)
+    try:
+        pad = len(stripped) % 4
+        stripped_padded = stripped + ("=" * ((4 - pad) % 4))
+        decoded_b64 = base64.b64decode(stripped_padded).decode("utf-8", errors="ignore")
+        if any(k in decoded_b64 for k in ["<AndroidAttestation", "<Keybox", "<CertificateChain", "<?xml"]):
+            text_candidates.append(decoded_b64)
+    except Exception:
+        pass
+
+    # 2. Check for embedded Base64 blocks inside text / JSON / HTML
+    b64_pattern = re.compile(r"(?:[A-Za-z0-9+/]{4}){10,}(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?")
+    for m in b64_pattern.finditer(raw_str):
+        chunk = m.group(0)
+        try:
+            dec_chunk = base64.b64decode(chunk).decode("utf-8", errors="ignore")
+            if any(k in dec_chunk for k in ["<AndroidAttestation", "<Keybox", "<CertificateChain"]):
+                text_candidates.append(dec_chunk)
+        except Exception:
+            pass
+
     extracted = []
+    seen_hashes = set()
 
-    # 1. Look for <AndroidAttestation>...</AndroidAttestation> blocks
-    attest_pattern = re.compile(r"(<\?xml[^>]*\?>\s*)?(<AndroidAttestation\b[\s\S]*?</AndroidAttestation>)", re.IGNORECASE)
-    for match in attest_pattern.finditer(content):
-        xml_block = match.group(0).strip()
-        if xml_block and xml_block not in extracted:
-            extracted.append(xml_block)
+    for txt in text_candidates:
+        if not txt or not txt.strip():
+            continue
 
-    # 2. Look for <Keybox>...</Keybox> blocks
-    if not extracted:
-        keybox_pattern = re.compile(r"(<\?xml[^>]*\?>\s*)?(<Keybox\b[\s\S]*?</Keybox>)", re.IGNORECASE)
-        for match in keybox_pattern.finditer(content):
-            xml_block = match.group(0).strip()
-            if xml_block and xml_block not in extracted:
-                extracted.append(xml_block)
+        clean_txt = re.sub(r"<\?xml.*?\?>", "", txt).strip()
+        parsed_via_et = False
 
-    # 3. If no regex match but content looks like direct Keybox XML
-    if not extracted and ("<AndroidAttestation" in content or "<Keybox" in content or "<CertificateChain" in content):
-        extracted.append(content.strip())
+        # Attempt structured XML tree parsing to decompose multi-keybox documents
+        try:
+            root = ET.fromstring(clean_txt)
+            keyboxes = [e for e in root.iter() if e.tag.endswith("Keybox")]
+            if keyboxes:
+                parsed_via_et = True
+                for kb in keyboxes:
+                    kb_xml = ET.tostring(kb, encoding="unicode").strip()
+                    kb_hash = re.sub(r"\s+", "", kb_xml)
+                    if kb_hash not in seen_hashes:
+                        seen_hashes.add(kb_hash)
+                        wrapped = f'<?xml version="1.0"?>\n<AndroidAttestation>\n    <NumberOfKeyboxes>1</NumberOfKeyboxes>\n    {kb_xml}\n</AndroidAttestation>'
+                        extracted.append(wrapped)
+        except Exception:
+            pass
+
+        if not parsed_via_et:
+            # Regex fallback for <AndroidAttestation> blocks
+            attest_pattern = re.compile(r"(<\?xml[^>]*\?>\s*)?(<AndroidAttestation\b[\s\S]*?</AndroidAttestation>)", re.IGNORECASE)
+            for match in attest_pattern.finditer(txt):
+                xml_block = match.group(0).strip()
+                block_hash = re.sub(r"\s+", "", xml_block)
+                if block_hash not in seen_hashes:
+                    seen_hashes.add(block_hash)
+                    extracted.append(xml_block)
+
+            # Regex fallback for <Keybox> blocks
+            keybox_pattern = re.compile(r"(<\?xml[^>]*\?>\s*)?(<Keybox\b[\s\S]*?</Keybox>)", re.IGNORECASE)
+            for match in keybox_pattern.finditer(txt):
+                xml_block = match.group(0).strip()
+                block_hash = re.sub(r"\s+", "", xml_block)
+                if block_hash not in seen_hashes:
+                    seen_hashes.add(block_hash)
+                    wrapped = f'<?xml version="1.0"?>\n<AndroidAttestation>\n    <NumberOfKeyboxes>1</NumberOfKeyboxes>\n    {xml_block}\n</AndroidAttestation>'
+                    extracted.append(wrapped)
+
+            # Direct fallback if content has XML elements but regex missed
+            if not extracted and ("<AndroidAttestation" in txt or "<Keybox" in txt or "<CertificateChain" in txt):
+                txt_hash = re.sub(r"\s+", "", txt.strip())
+                if txt_hash not in seen_hashes:
+                    seen_hashes.add(txt_hash)
+                    extracted.append(txt.strip())
 
     return extracted
 
@@ -983,6 +1105,7 @@ async def run_sources_keybox_scraper(
             "scraped_files": 0,
             "valid_found": 0,
             "saved_to_db": 0,
+            "duplicates_found": 0,
             "revoked_or_invalid": 0,
             "skipped_existing": 0,
             "status": "completed",
@@ -995,6 +1118,7 @@ async def run_sources_keybox_scraper(
         "scraped_files": 0,
         "valid_found": 0,
         "saved_to_db": 0,
+        "duplicates_found": 0,
         "revoked_or_invalid": 0,
         "skipped_existing": 0,
         "details": [],
@@ -1058,9 +1182,11 @@ async def run_sources_keybox_scraper(
                                 if isinstance(item, dict):
                                     # 1. Direct inline XML field
                                     inline_xml = item.get("xml") or item.get("xml_content") or item.get("content") or item.get("keybox")
-                                    if inline_xml and ("<AndroidAttestation" in inline_xml or "<Keybox" in inline_xml):
-                                        extracted_xmls.append(inline_xml)
-                                        continue
+                                    if inline_xml:
+                                        found = extract_keyboxes_from_raw_content(str(inline_xml))
+                                        if found:
+                                            extracted_xmls.extend(found)
+                                            continue
 
                                     # 2. Keybox Hub / API ID download (e.g. /api/download?id=X)
                                     kid = item.get("id")
@@ -1068,8 +1194,8 @@ async def run_sources_keybox_scraper(
                                         dl_url = f"{origin}/api/download?id={kid}"
                                         try:
                                             sub_r = await http_client.get(dl_url)
-                                            if sub_r.status_code == 200 and ("<AndroidAttestation" in sub_r.text or "<Keybox" in sub_r.text):
-                                                extracted_xmls.append(sub_r.text.strip())
+                                            if sub_r.status_code == 200:
+                                                extracted_xmls.extend(extract_keyboxes_from_raw_content(sub_r.text))
                                         except Exception as dl_e:
                                             logger.warning(f"Error downloading keybox ID {kid} from {dl_url}: {dl_e}")
 
@@ -1081,8 +1207,8 @@ async def run_sources_keybox_scraper(
                                         if dl_path != url:
                                             try:
                                                 sub_r = await http_client.get(dl_path)
-                                                if sub_r.status_code == 200 and ("<AndroidAttestation" in sub_r.text or "<Keybox" in sub_r.text):
-                                                    extracted_xmls.append(sub_r.text.strip())
+                                                if sub_r.status_code == 200:
+                                                    extracted_xmls.extend(extract_keyboxes_from_raw_content(sub_r.text))
                                             except Exception as dl_e:
                                                 logger.warning(f"Error fetching path {dl_path}: {dl_e}")
                     except Exception:
@@ -1144,7 +1270,7 @@ async def run_sources_keybox_scraper(
                                 "chain_valid": res.get("chainValid", True),
                                 "private_key_match": res.get("privateKeyMatch", True),
                                 "is_softbanned": res.get("isSoftbanned", False),
-                                "xml_content": xml_str,
+                                "xml_content": ensure_base64_xml(xml_str),
                                 "created_at": (existing.get("created_at") if existing else None) or now_str,
                                 "last_checked_at": now_str,
                                 "status": status_str,
@@ -1191,11 +1317,14 @@ async def run_sources_keybox_scraper(
                         item_label = f"Keybox #{i}" if len(extracted_xmls) > 1 else "Keybox"
                         if existing:
                             stats["skipped_existing"] += 1
+                            stats["duplicates_found"] += 1
                             if name in by_source:
                                 by_source[name]["skipped_existing"] += 1
+                                by_source[name]["duplicates_found"] += 1
+                            first_added = existing.get("created_at") or "earlier"
                             stats["details"].append({
-                                "type": log_type,
-                                "text": f"{name} ({item_label}): SN {serial} -> {status_str}{reason} (Updated in DB)"
+                                "type": "warning",
+                                "text": f"{name} ({item_label}): ⚠️ Duplicate Keybox (SN {serial}) - Already present in pool (added {first_added}). Status refreshed to {status_str}{reason}"
                             })
                         else:
                             stats["saved_to_db"] += 1
@@ -1305,6 +1434,7 @@ async def background_sources_scraper_loop():
 async def lifespan(app: FastAPI):
     logger.info("Initializing Keybox database...")
     init_db()
+    migrate_existing_keyboxes_to_base64()
     reclassify_all_stored_keyboxes()
     logger.info("Starting background Google attestation status downloader...")
     asyncio.create_task(update_attestation_status_loop())
@@ -1391,10 +1521,17 @@ def api_check_keybox(req: KeyboxCheckRequest):
         serial = res.get("serialNumber", "unknown")
         is_valid = status_str in ["STRONG", "SOFTBAN"]
         saved = False
+        is_duplicate = False
+        duplicate_warning = None
         try:
             dhaka_tz = datetime.timezone(datetime.timedelta(hours=6))
             now_str = datetime.datetime.now(dhaka_tz).isoformat()
             existing = db.keyboxes.find_one({"serial_number": serial})
+            if existing:
+                is_duplicate = True
+                first_added = existing.get("created_at") or "previously"
+                duplicate_warning = f"Duplicate Keybox: Serial '{serial}' is already present in your pool (First added: {first_added}). Status has been updated."
+
             is_revoked_or_invalid = status_str in ["REVOKED", "INVALID"]
             detected_revoked_at = None
             if is_revoked_or_invalid:
@@ -1414,7 +1551,7 @@ def api_check_keybox(req: KeyboxCheckRequest):
                     "chain_valid": res.get("chainValid", True),
                     "private_key_match": res.get("privateKeyMatch", True),
                     "is_softbanned": res.get("isSoftbanned", False),
-                    "xml_content": req.xml_content,
+                    "xml_content": ensure_base64_xml(req.xml_content),
                     "created_at": (existing.get("created_at") if existing else None) or now_str,
                     "last_checked_at": now_str,
                     "status": status_str,
@@ -1427,9 +1564,14 @@ def api_check_keybox(req: KeyboxCheckRequest):
         except Exception as dbe:
             logger.error(f"Failed to save keybox to database: {dbe}")
                 
+        res["isDuplicate"] = is_duplicate
+        res["duplicateWarning"] = duplicate_warning
+
         return {
             "success": is_valid,
             "status": status_str,
+            "is_duplicate": is_duplicate,
+            "duplicate_warning": duplicate_warning,
             "result": res,
             "saved": saved
         }
@@ -1451,7 +1593,13 @@ def api_get_keyboxes():
             return (3, k.get("created_at") or "")
 
         kbs.sort(key=sort_priority)
-        return [serialize_doc(kb) for kb in kbs]
+        serialized = []
+        for kb in kbs:
+            doc = serialize_doc(kb)
+            # Ensure XML is decoded for web UI preview and copy
+            doc["xml_content"] = decode_base64_xml(doc.get("xml_content", ""))
+            serialized.append(doc)
+        return serialized
     except Exception as e:
         logger.error(f"Error fetching keyboxes: {e}")
         raise HTTPException(status_code=500, detail="Internal server error fetching keyboxes")
@@ -1460,6 +1608,7 @@ def api_get_keyboxes():
 def api_download_random_valid_keybox():
     """
     Download a random keybox.xml (Strong -> SoftBan / Device priority).
+    Decodes stored Base64 format on the fly and returns standard keybox.xml.
     Allows easy integration with scripts, Magisk or KernelSU modules via REST API.
     """
     try:
@@ -1481,9 +1630,12 @@ def api_download_random_valid_keybox():
 
         import random
         chosen = random.choice(candidates)
-        xml_content = chosen.get("xml_content", "")
-        if not xml_content:
+        raw_xml_content = chosen.get("xml_content", "")
+        if not raw_xml_content:
             raise HTTPException(status_code=404, detail="Keybox XML content is empty.")
+
+        # Decode from Base64 database format to standard XML
+        xml_content = decode_base64_xml(raw_xml_content)
 
         serial = chosen.get("serial_number", "keybox")
         device_id = chosen.get("device_id", "Unknown")
@@ -1506,6 +1658,37 @@ def api_download_random_valid_keybox():
         raise
     except Exception as e:
         logger.error(f"Error downloading random valid keybox: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/keybox/download/{serial_number}")
+@app.get("/api/keyboxes/{serial_number}/download")
+def api_download_keybox_by_serial(serial_number: str):
+    """Download a specific keybox.xml by serial number, converting stored Base64 into standard XML."""
+    try:
+        kb = db.keyboxes.find_one({"serial_number": serial_number})
+        if not kb:
+            raise HTTPException(status_code=404, detail=f"Keybox with serial '{serial_number}' not found.")
+        raw_xml = kb.get("xml_content", "")
+        if not raw_xml:
+            raise HTTPException(status_code=404, detail="Keybox XML content is empty.")
+        xml_decoded = decode_base64_xml(raw_xml)
+
+        return Response(
+            content=xml_decoded,
+            media_type="application/xml",
+            headers={
+                "Content-Disposition": f'attachment; filename="keybox_{serial_number}.xml"',
+                "X-Keybox-Serial": str(kb.get("serial_number", serial_number)),
+                "X-Keybox-Device": str(kb.get("device_id", "Unknown")),
+                "X-Keybox-Root": str(kb.get("root_type", "Unknown")),
+                "X-Keybox-Status": str(kb.get("status", "Unknown")),
+                "Access-Control-Expose-Headers": "Content-Disposition, X-Keybox-Serial, X-Keybox-Device, X-Keybox-Root, X-Keybox-Status"
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error downloading keybox by serial {serial_number}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/api/keyboxes/{serial_number}")
