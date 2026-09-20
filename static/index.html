@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Keybox Attestation Checker & Pool Manager - Validate Android Keyboxes, check Google revocation lists, and scrape keyboxes from raw URLs.">
+    <title>Keybox Checker | Android Attestation & Pool Manager</title>
+
+    <!-- Preconnect & Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+
+<body>
+    <!-- Radial Glowing Mesh Backgrounds -->
+    <div class="mesh-glow bg-glow-1"></div>
+    <div class="mesh-glow bg-glow-2"></div>
+    <div class="mesh-glow bg-glow-3"></div>
+
+    <div class="app-container">
+        <!-- Main App Header -->
+        <header class="app-header">
+            <div class="logo-container">
+                <div class="logo-icon">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <div class="logo-text">
+                    <h1>KEYBOX CHECKER</h1>
+                    <span>Android Attestation & Pool Manager</span>
+                </div>
+            </div>
+
+            <!-- Global Quick Stats Pill Badges -->
+            <div class="header-stats-strip">
+                <div class="stat-badge green" title="Strong Hardware Attestation Keyboxes in Pool">
+                    <i class="fa-solid fa-shield-check"></i>
+                    <span class="stat-label">Strong:</span>
+                    <span class="stat-number" id="hdr-stat-strong">0</span>
+                </div>
+                <div class="stat-badge orange" title="Device / Softbanned Keyboxes in Pool">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span class="stat-label">SoftBan:</span>
+                    <span class="stat-number" id="hdr-stat-softban">0</span>
+                </div>
+                <div class="stat-badge red" title="Revoked in Google CRL">
+                    <i class="fa-solid fa-ban"></i>
+                    <span class="stat-label">Revoked:</span>
+                    <span class="stat-number" id="hdr-stat-revoked">0</span>
+                </div>
+                <div class="stat-badge blue" title="Total Keyboxes Stored in Database">
+                    <i class="fa-solid fa-database"></i>
+                    <span class="stat-label">Pool:</span>
+                    <span class="stat-number" id="hdr-stat-total">0</span>
+                </div>
+                <div class="stat-badge purple" title="Raw URL Sources Monitored">
+                    <i class="fa-solid fa-globe"></i>
+                    <span class="stat-label">Sources:</span>
+                    <span class="stat-number" id="hdr-stat-sources">0</span>
+                </div>
+            </div>
+
+            <!-- Header Actions -->
+            <div class="header-actions">
+                <button id="btn-open-sources-modal" class="btn btn-sources-launcher" type="button"
+                    title="Open Sources Scraper Window">
+                    <i class="fa-solid fa-globe"></i> Sources Scraper
+                    <span class="launcher-badge" id="launcher-sources-badge">0</span>
+                </button>
+
+                <div class="theme-switcher-global" id="theme-switcher">
+                    <button class="theme-toggle-btn active" data-theme="system" title="System Default"
+                        aria-label="System Default Theme">
+                        <i class="fa-solid fa-desktop"></i>
+                    </button>
+                    <button class="theme-toggle-btn" data-theme="light" title="Light Mode" aria-label="Light Theme">
+                        <i class="fa-solid fa-sun"></i>
+                    </button>
+                    <button class="theme-toggle-btn" data-theme="dark" title="Dark Mode" aria-label="Dark Theme">
+                        <i class="fa-solid fa-moon"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Workspace -->
+        <main class="main-content">
+            <div class="keybox-dashboard">
+                <!-- Left Column: Download a keybox -->
+                <section class="keybox-download-panel glass-panel download-card" aria-label="Download Keybox">
+                    <div class="panel-header">
+                        <div class="header-title-wrap">
+                            <h2 style="display: flex; align-items: center; gap: 10px;">
+                                <i class="fa-solid fa-cloud-arrow-down" style="color: var(--accent);"></i> Download a keybox
+                                <span class="api-tag-badge">/api/download</span>
+                            </h2>
+                            <p>Download a verified, unrevoked keybox.xml from the active database pool</p>
+                        </div>
+                        <div class="download-badge-indicator" title="Prioritizes Strong Attestation">
+                            <span class="pulse-indicator"></span>
+                            <span class="indicator-text">Strong Priority</span>
+                        </div>
+                    </div>
+
+                    <div class="portal-body">
+                        <!-- Direct Keybox Download Hero Card -->
+                        <div class="download-hero-box">
+                            <div class="download-hero-glow"></div>
+                            <div class="download-hero-content">
+                                <div class="download-icon-circle">
+                                    <i class="fa-solid fa-file-arrow-down"></i>
+                                </div>
+                                <h3>Instant Keybox Download</h3>
+                                <p>Random valid keybox with Strong / Hardware Google root priority</p>
+
+                                <div class="download-specs-grid">
+                                    <div class="download-spec-item">
+                                        <span class="spec-label">Format</span>
+                                        <span class="spec-value">keybox.xml</span>
+                                    </div>
+                                    <div class="download-spec-item">
+                                        <span class="spec-label">Endpoint</span>
+                                        <span class="spec-value highlight">/api/download</span>
+                                    </div>
+                                    <div class="download-spec-item">
+                                        <span class="spec-label">Integrity Status</span>
+                                        <span class="spec-value valid"><i class="fa-solid fa-shield-check"></i> Strong / SoftBan Priority</span>
+                                    </div>
+                                    <div class="download-spec-item">
+                                        <span class="spec-label">Revocation</span>
+                                        <span class="spec-value valid"><i class="fa-solid fa-shield-halved"></i> Clean / Unrevoked</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="portal-actions">
+                            <button id="btn-copy-download-url" class="btn btn-outline" type="button" title="Copy endpoint URL">
+                                <i class="fa-solid fa-link"></i> Copy URL
+                            </button>
+                            <a href="/api/download" download="keybox.xml" id="btn-direct-download-action" class="btn btn-primary" role="button">
+                                <i class="fa-solid fa-download"></i> Download keybox.xml
+                            </a>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Right Column: Verification Portal -->
+                <section class="keybox-portal-panel glass-panel verifier-card" aria-label="Keybox Verifier">
+                    <div class="panel-header">
+                        <div class="header-title-wrap">
+                            <h2><i class="fa-solid fa-shield-halved"></i> Keybox Attestation Verifier</h2>
+                            <p>Verify Android Attestation keys and check real-time Google revocation status</p>
+                        </div>
+                    </div>
+
+                    <!-- Input Method Selector -->
+                    <div class="input-method-selector">
+                        <button type="button" class="method-btn active" data-method="upload">
+                            <i class="fa-solid fa-file-arrow-up"></i> File Upload
+                        </button>
+                        <button type="button" class="method-btn" data-method="paste">
+                            <i class="fa-solid fa-code"></i> Paste XML Code
+                        </button>
+                    </div>
+
+                    <div class="portal-body">
+                        <!-- Method 1: File Upload Container -->
+                        <div id="method-upload-container" class="method-container active">
+                            <div id="keybox-dropzone" class="dropzone-area">
+                                <div class="dropzone-content">
+                                    <div class="dropzone-icon">
+                                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                                    </div>
+                                    <h3>Drag &amp; Drop keybox.xml</h3>
+                                    <p>or click to browse your local files</p>
+                                    <div id="selected-file-info" class="selected-file-info hidden">
+                                        <i class="fa-solid fa-file-code"></i>
+                                        <span id="selected-file-name">filename.xml</span>
+                                    </div>
+                                </div>
+                                <input type="file" id="keybox-file-input" accept=".xml" style="display: none;">
+                            </div>
+                        </div>
+
+                        <!-- Method 2: Raw XML Editor Paste Container -->
+                        <div id="method-paste-container" class="method-container" style="display: none;">
+                            <div class="code-editor-box">
+                                <div class="editor-header-bar">
+                                    <span class="lang-badge">XML</span>
+                                    <span class="editor-status-indicator" id="xml-editor-status">Ready</span>
+                                </div>
+                                <textarea id="keybox-xml-paste"
+                                    placeholder="Paste your <AndroidAttestation> xml block here..."
+                                    spellcheck="false"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="portal-actions">
+                            <button id="btn-reset-keybox" class="btn btn-outline" type="button">
+                                <i class="fa-solid fa-rotate-left"></i> Reset
+                            </button>
+                            <button id="btn-verify-keybox" class="btn btn-primary" type="button">
+                                <i class="fa-solid fa-circle-check"></i> Verify Keybox
+                            </button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Stored Active Pool -->
+            <section class="keybox-pool-panel glass-panel" aria-label="Active Keybox Pool">
+                <div class="panel-header">
+                    <div class="header-title-wrap">
+                        <h2 style="display: flex; align-items: center; gap: 10px;">
+                            <i class="fa-solid fa-key" style="color: var(--primary);"></i> Active Keybox Pool
+                            <span class="pool-count-badge" id="val-pool-count">0</span>
+                        </h2>
+                        <p>Stored keyboxes in database pool (Strong &amp; SoftBan prioritized on top)</p>
+                    </div>
+                    <div class="pool-header-actions">
+                        <span class="pool-last-checked-indicator" id="val-pool-last-checked" title="Last full attestation verification timestamp">
+                            <i class="fa-regular fa-clock"></i> <span id="pool-last-checked-text">Checked: Ready</span>
+                        </span>
+                        <button id="btn-refresh-pool" class="icon-btn-refresh" title="Re-check all keyboxes against Google CRL & refresh pool" type="button" aria-label="Re-check pool">
+                            <i class="fa-solid fa-rotate"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Pool Grid Container -->
+                <div id="pool-grid-container" class="pool-grid">
+                    <!-- Cards injected via JS -->
+                </div>
+            </section>
+
+            <!-- Build it into your workflow Section -->
+            <section class="workflow-section" aria-label="API Workflow Integration">
+                <div class="workflow-header">
+                    <h2>Build it into your workflow</h2>
+                    <p>Connect Keybox Hub to your scripts, Magisk or KernelSU modules with the REST API.</p>
+                </div>
+
+                <div class="workflow-card glass-panel">
+                    <div class="api-endpoint-header">
+                        <span class="http-method-badge get">GET</span>
+                        <span class="api-endpoint-path">/api/download</span>
+                    </div>
+                    <p class="api-endpoint-desc">Download a random valid keybox.xml (Strong &rarr; Device priority)</p>
+                    <div class="code-command-box">
+                        <code id="curl-command-text">curl -L -o keybox.xml <span id="api-download-full-url">http://localhost:8000/api/download</span></code>
+                        <button class="btn-copy-code" id="btn-copy-curl" title="Copy command" type="button">
+                            <i class="fa-solid fa-copy"></i>
+                            <span class="copy-text">Copy</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Sources Keybox Scraper Floating Modal -->
+    <div id="sources-scraper-modal" class="modal-overlay scraper-floating-modal">
+        <div class="modal-content sources-pic-modal popup-anim">
+            <!-- Header Row -->
+            <div class="sources-pic-header">
+                <div class="sources-pic-header-left">
+                    <div class="sources-pic-icon">
+                        <i class="fa-solid fa-globe"></i>
+                    </div>
+                    <div class="sources-pic-titles">
+                        <h2 class="sources-pic-title">Community sources</h2>
+                        <p class="sources-pic-subtitle">Scanned every hour. Imports both Strong &amp; Device keys, skips duplicates automatically.</p>
+                    </div>
+                </div>
+                <div class="sources-pic-header-right">
+                    <button id="btn-run-sources-scraper" class="sources-pic-scan-btn" type="button">
+                        <i class="fa-solid fa-rotate"></i> Scan sources now
+                    </button>
+                    <button class="sources-pic-close-btn" id="btn-close-sources-modal" type="button" aria-label="Close Modal">&times;</button>
+                </div>
+            </div>
+
+            <!-- Add Source Input Bar -->
+            <div class="sources-pic-add-row">
+                <input type="url" id="sources-add-url-input" class="sources-pic-input url-input"
+                    placeholder="Enter new source link (e.g. https://raw.githubusercontent.com/.../keybox.xml)" />
+                <input type="text" id="sources-add-name-input" class="sources-pic-input name-input"
+                    placeholder="Source name (optional)" />
+                <button id="btn-add-source-action" class="sources-pic-add-btn" type="button">
+                    <i class="fa-solid fa-plus"></i> Add &amp; scan
+                </button>
+            </div>
+
+            <!-- Sources Table -->
+            <div class="sources-pic-table-container">
+                <table class="sources-pic-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 25%;">Source</th>
+                            <th style="width: 12%;">Type</th>
+                            <th style="width: 33%;">URL Address</th>
+                            <th style="width: 17%;">Scan Status</th>
+                            <th style="width: 13%;">Last Scanned</th>
+                            <th style="width: 60px; text-align: center;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="sources-table-body">
+                        <!-- Dynamic rows injected via JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Activity Log Drawer -->
+            <div class="sources-pic-log-wrapper">
+                <details class="sources-pic-log-details">
+                    <summary class="sources-pic-log-summary">
+                        <span><i class="fa-solid fa-terminal"></i> Activity Log</span>
+                        <button id="btn-clear-sources-logs" class="btn-clear-logs-mini" type="button" title="Clear log">Clear</button>
+                    </summary>
+                    <div id="sources-log-console" class="sources-pic-log-console">
+                        <div id="sources-log-list" class="log-entries-list">
+                            <div class="log-entry info"><span class="log-tag info">INFO</span> Ready to scan community sources.</div>
+                        </div>
+                    </div>
+                </details>
+            </div>
+        </div>
+    </div>
+
+    <!-- Keybox Result Modal Popup -->
+    <div class="modal-overlay" id="keybox-result-modal">
+        <div class="modal-content glass-panel popup-anim"
+            style="max-width: 620px; width: 92%; max-height: 85vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; border: 1px solid var(--border-color); box-shadow: var(--shadow-lg);">
+            <div class="modal-header"
+                style="padding: 16px 20px; border-bottom: 1px solid var(--border-color); flex-shrink: 0; display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="margin: 0; font-size: 17px; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-shield-halved" style="color: var(--primary);"></i> Keybox Check Details
+                </h2>
+                <button class="close-btn" onclick="window.closeKeyboxResultModal()" aria-label="Close Modal"
+                    style="font-size: 22px; background: transparent; border: none; color: var(--text-muted); cursor: pointer; transition: color var(--transition-fast) ease;">&times;</button>
+            </div>
+            <div class="modal-body-scroll" style="padding: 18px 22px; overflow-y: auto; flex-grow: 1;">
+                <div id="keybox-result-container">
+                    <!-- JS injects results here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="/static/js/app.js" defer></script>
+</body>
+
+</html>
