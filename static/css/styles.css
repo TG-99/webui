@@ -445,12 +445,14 @@ html.light-theme .pool-last-checked-indicator {
 
 /* Panel Headers */
 .panel-header {
-  padding: 20px 24px 16px;
+  padding: 18px 24px 16px;
   border-bottom: 1px solid var(--border-color);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  min-height: 80px;
+  box-sizing: border-box;
 }
 
 .header-title-wrap h2 {
@@ -486,15 +488,17 @@ html.light-theme .pool-last-checked-indicator {
 /* Method Selector */
 .input-method-selector {
   display: flex;
-  padding: 12px 24px 0;
+  padding: 14px 24px 0;
   gap: 10px;
+  box-sizing: border-box;
 }
 
 .method-btn {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border-color);
   color: var(--text-muted);
-  padding: 8px 16px;
+  padding: 0 16px;
+  height: 36px;
   border-radius: var(--radius-sm);
   font-size: 0.85rem;
   font-weight: 600;
@@ -503,6 +507,7 @@ html.light-theme .pool-last-checked-indicator {
   align-items: center;
   gap: 8px;
   transition: all var(--transition-fast);
+  box-sizing: border-box;
 }
 
 .method-btn:hover {
@@ -518,19 +523,38 @@ html.light-theme .pool-last-checked-indicator {
 
 /* Portal Body */
 .portal-body {
-  padding: 20px 24px 24px;
+  padding: 16px 24px 20px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.method-container {
+  flex: 1;
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
 }
 
 /* Dropzone */
 .dropzone-area {
   border: 2px dashed rgba(99, 102, 241, 0.35);
   border-radius: var(--radius-md);
-  padding: 36px 20px;
+  padding: 14px 20px;
   text-align: center;
   cursor: pointer;
   background: rgba(99, 102, 241, 0.03);
   position: relative;
   overflow: hidden;
+  height: 100%;
+  flex: 1;
+  min-height: 220px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   transition: all var(--transition-normal);
 }
 
@@ -542,9 +566,9 @@ html.light-theme .pool-last-checked-indicator {
 }
 
 .dropzone-icon {
-  font-size: 42px;
+  font-size: 36px;
   color: var(--primary);
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   transition: transform var(--transition-fast);
 }
 
@@ -552,30 +576,47 @@ html.light-theme .pool-last-checked-indicator {
   transform: translateY(-4px) scale(1.05);
 }
 
+.dropzone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
 .dropzone-content h3 {
-  font-size: 1rem;
+  font-size: 0.98rem;
   font-weight: 600;
   color: var(--text-main);
+  margin: 0;
 }
 
 .dropzone-content p {
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   color: var(--text-muted);
   margin-top: 4px;
 }
 
 .selected-file-info {
-  margin-top: 14px;
+  margin-top: 8px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 14px;
+  padding: 5px 14px;
   background: rgba(16, 185, 129, 0.15);
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  border: 1px solid rgba(16, 185, 129, 0.35);
   color: var(--success);
   border-radius: var(--radius-full);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 600;
+  max-width: 90%;
+  box-sizing: border-box;
+}
+
+.selected-file-info span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .selected-file-info.hidden {
@@ -588,6 +629,12 @@ html.light-theme .pool-last-checked-indicator {
   border-radius: var(--radius-md);
   overflow: hidden;
   background: rgba(0, 0, 0, 0.25);
+  height: 100%;
+  flex: 1;
+  min-height: 220px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 
 html.light-theme .code-editor-box {
@@ -601,6 +648,7 @@ html.light-theme .code-editor-box {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
 }
 
 .lang-badge {
@@ -618,16 +666,19 @@ html.light-theme .code-editor-box {
 
 .code-editor-box textarea {
   width: 100%;
-  height: 180px;
+  flex: 1;
+  height: 100%;
+  min-height: 150px;
   background: transparent;
   border: none;
   color: var(--text-main);
   font-family: var(--font-mono);
   font-size: 0.82rem;
   line-height: 1.5;
-  padding: 12px 14px;
-  resize: vertical;
+  padding: 10px 14px;
+  resize: none;
   outline: none;
+  box-sizing: border-box;
 }
 
 /* Portal Actions */
@@ -636,7 +687,11 @@ html.light-theme .code-editor-box {
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
-  margin-top: 20px;
+  margin-top: 16px;
+  min-height: 42px;
+  height: auto;
+  box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 /* Download Keybox Panel Styles */
@@ -694,7 +749,7 @@ html.light-theme .code-editor-box {
 .download-hero-box {
   border: 2px dashed rgba(6, 182, 212, 0.35);
   border-radius: var(--radius-md);
-  padding: 24px 20px;
+  padding: 16px 20px;
   text-align: center;
   background: rgba(6, 182, 212, 0.03);
   position: relative;
@@ -702,6 +757,10 @@ html.light-theme .code-editor-box {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
+  min-height: 220px;
+  height: auto;
+  box-sizing: border-box;
   transition: all var(--transition-normal);
 }
 
@@ -730,20 +789,21 @@ html.light-theme .code-editor-box {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
 }
 
 .download-icon-circle {
-  width: 48px;
-  height: 48px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(99, 102, 241, 0.2));
   border: 1px solid rgba(6, 182, 212, 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
+  font-size: 20px;
   color: var(--accent);
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   transition: transform var(--transition-fast);
 }
 
@@ -752,16 +812,163 @@ html.light-theme .code-editor-box {
 }
 
 .download-hero-content h3 {
-  font-size: 1rem;
+  font-size: 0.98rem;
   font-weight: 700;
   color: var(--text-main);
+  margin: 0;
 }
 
 .download-hero-content p {
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   color: var(--text-muted);
-  margin-top: 3px;
+  margin-top: 2px;
   max-width: 400px;
+  min-height: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+/* Interactive Spec Grid Items & Mode Toggle */
+.interactive-spec-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+#grid-target-random-view {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+#grid-target-selected-view {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.grid-mode-toggle-wrap {
+  display: flex;
+  gap: 4px;
+  margin-top: 3px;
+  width: 100%;
+  height: 28px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 2px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-color);
+  box-sizing: border-box;
+}
+
+html.light-theme .grid-mode-toggle-wrap {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.grid-mode-pill {
+  flex: 1;
+  padding: 0 8px;
+  height: 100%;
+  border-radius: var(--radius-full);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.73rem;
+  font-weight: 600;
+  font-family: var(--font-main);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+.grid-mode-pill:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.grid-mode-pill.active {
+  background: linear-gradient(135deg, var(--accent), #0284c7);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 2px 8px var(--accent-glow);
+}
+
+.grid-select-wrapper {
+  position: relative;
+  width: 100%;
+  margin-top: 3px;
+}
+
+.grid-keybox-dropdown {
+  width: 100%;
+  height: 28px;
+  padding: 0 24px 0 10px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(6, 182, 212, 0.4);
+  border-radius: var(--radius-full);
+  color: var(--text-main);
+  font-family: var(--font-mono);
+  font-size: 0.73rem;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: all var(--transition-fast);
+}
+
+.grid-select-wrapper::after {
+  content: '\f078';
+  font-family: 'Font Awesome 6 Free';
+  font-weight: 900;
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--accent);
+  pointer-events: none;
+  font-size: 0.62rem;
+}
+
+html.light-theme .grid-keybox-dropdown {
+  background: #ffffff;
+  border-color: rgba(6, 182, 212, 0.5);
+  color: #0f172a;
+}
+
+.grid-keybox-dropdown:hover {
+  border-color: var(--accent);
+  background: rgba(6, 182, 212, 0.08);
+}
+
+.grid-keybox-dropdown:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+
+.grid-keybox-dropdown option {
+  background: #0f172a;
+  color: #f8fafc;
+  padding: 6px 10px;
+}
+
+html.light-theme .grid-keybox-dropdown option {
+  background: #ffffff;
+  color: #0f172a;
 }
 
 .download-specs-grid {
@@ -769,18 +976,22 @@ html.light-theme .code-editor-box {
   grid-template-columns: 1fr 1fr;
   gap: 8px;
   width: 100%;
-  margin-top: 14px;
+  margin-top: 10px;
 }
 
 .download-spec-item {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  padding: 8px 12px;
+  padding: 6px 12px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  justify-content: center;
   text-align: left;
+  min-height: 60px;
+  height: 60px;
+  box-sizing: border-box;
 }
 
 .download-spec-item .spec-label {
@@ -2100,14 +2311,34 @@ html.light-theme .modal-overlay {
     padding: 16px;
   }
 
+  .method-container {
+    min-height: auto;
+    height: auto;
+  }
+
+  .download-hero-box {
+    min-height: auto;
+    height: auto;
+    padding: 14px 12px;
+  }
+
+  .download-specs-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
   .portal-actions {
     flex-direction: column;
     align-items: stretch;
-    gap: 8px;
+    gap: 10px;
+    height: auto;
+    min-height: auto;
+    margin-top: 16px;
   }
 
   .portal-actions .btn {
     width: 100%;
+    justify-content: center;
   }
 
   /* Sources Scraper Modal */

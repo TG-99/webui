@@ -101,14 +101,17 @@
                     <div class="panel-header">
                         <div class="header-title-wrap">
                             <h2 style="display: flex; align-items: center; gap: 10px;">
-                                <i class="fa-solid fa-cloud-arrow-down" style="color: var(--accent);"></i> Download a keybox
+                                <i class="fa-solid fa-cloud-arrow-down" style="color: var(--accent);"></i> Download a
+                                keybox
                                 <span class="api-tag-badge">/api/download</span>
                             </h2>
-                            <p>Download a verified, unrevoked keybox.xml from the active database pool</p>
+                            <p id="download-header-subtitle">Download a unrevoked keybox.xml from the active database
+                                pool</p>
                         </div>
-                        <div class="download-badge-indicator" title="Prioritizes Strong Attestation">
+                        <div class="download-badge-indicator" id="download-mode-badge-indicator"
+                            title="Current Download Mode">
                             <span class="pulse-indicator"></span>
-                            <span class="indicator-text">Strong Priority</span>
+                            <span class="indicator-text" id="download-mode-badge-text">Random Priority</span>
                         </div>
                     </div>
 
@@ -118,10 +121,11 @@
                             <div class="download-hero-glow"></div>
                             <div class="download-hero-content">
                                 <div class="download-icon-circle">
-                                    <i class="fa-solid fa-file-arrow-down"></i>
+                                    <i class="fa-solid fa-file-arrow-down" id="download-hero-icon"></i>
                                 </div>
-                                <h3>Instant Keybox Download</h3>
-                                <p>Random valid keybox with Strong / Hardware Google root priority</p>
+                                <h3 id="download-hero-title">Instant Keybox Download</h3>
+                                <p id="download-hero-desc">Random valid keybox with Strong / Hardware Google root
+                                    priority</p>
 
                                 <div class="download-specs-grid">
                                     <div class="download-spec-item">
@@ -132,13 +136,36 @@
                                         <span class="spec-label">Endpoint</span>
                                         <span class="spec-value highlight">/api/download</span>
                                     </div>
-                                    <div class="download-spec-item">
-                                        <span class="spec-label">Integrity Status</span>
-                                        <span class="spec-value valid"><i class="fa-solid fa-shield-check"></i> Strong / SoftBan Priority</span>
+                                    <div class="download-spec-item interactive-spec-item">
+                                        <span class="spec-label">Active Mode</span>
+                                        <div class="grid-mode-toggle-wrap">
+                                            <button type="button" class="grid-mode-pill active" id="btn-mode-random"
+                                                data-download-mode="random" title="Serve random priority keybox">
+                                                <i class="fa-solid fa-shuffle"></i> Random
+                                            </button>
+                                            <button type="button" class="grid-mode-pill" id="btn-mode-selected"
+                                                data-download-mode="selected" title="Serve specific selected keybox">
+                                                <i class="fa-solid fa-hand-pointer"></i> Selected
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div class="download-spec-item">
-                                        <span class="spec-label">Revocation</span>
-                                        <span class="spec-value valid"><i class="fa-solid fa-shield-halved"></i> Clean / Unrevoked</span>
+                                    <div class="download-spec-item interactive-spec-item"
+                                        id="spec-item-target-container">
+                                        <div id="grid-target-random-view" style="width: 100%;">
+                                            <span class="spec-label" id="spec-lbl-target">Integrity Status</span>
+                                            <span class="spec-value valid" id="spec-val-target"><i
+                                                    class="fa-solid fa-shield-check"></i> Strong Priority</span>
+                                        </div>
+                                        <div id="grid-target-selected-view" style="display: none; width: 100%;">
+                                            <span class="spec-label" id="spec-lbl-dropdown"><i
+                                                    class="fa-solid fa-key"></i> Keybox Target</span>
+                                            <div class="grid-select-wrapper">
+                                                <select id="select-download-keybox" class="grid-keybox-dropdown"
+                                                    aria-label="Select Keybox">
+                                                    <option value="" disabled selected>Loading pool...</option>
+                                                </select>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -146,10 +173,12 @@
 
                         <!-- Action Buttons -->
                         <div class="portal-actions">
-                            <button id="btn-copy-download-url" class="btn btn-outline" type="button" title="Copy endpoint URL">
+                            <button id="btn-copy-download-url" class="btn btn-outline" type="button"
+                                title="Copy endpoint URL">
                                 <i class="fa-solid fa-link"></i> Copy URL
                             </button>
-                            <a href="/api/download" download="keybox.xml" id="btn-direct-download-action" class="btn btn-primary" role="button">
+                            <a href="/api/download" download="keybox.xml" id="btn-direct-download-action"
+                                class="btn btn-primary" role="button">
                                 <i class="fa-solid fa-download"></i> Download keybox.xml
                             </a>
                         </div>
@@ -231,10 +260,13 @@
                         <p>Stored keyboxes in database pool (Strong &amp; SoftBan prioritized on top)</p>
                     </div>
                     <div class="pool-header-actions">
-                        <span class="pool-last-checked-indicator" id="val-pool-last-checked" title="Last full attestation verification timestamp">
+                        <span class="pool-last-checked-indicator" id="val-pool-last-checked"
+                            title="Last full attestation verification timestamp">
                             <i class="fa-regular fa-clock"></i> <span id="pool-last-checked-text">Checked: Ready</span>
                         </span>
-                        <button id="btn-refresh-pool" class="icon-btn-refresh" title="Re-check all keyboxes against Google CRL & refresh pool" type="button" aria-label="Re-check pool">
+                        <button id="btn-refresh-pool" class="icon-btn-refresh"
+                            title="Re-check all keyboxes against Google CRL & refresh pool" type="button"
+                            aria-label="Re-check pool">
                             <i class="fa-solid fa-rotate"></i>
                         </button>
                     </div>
@@ -260,7 +292,8 @@
                     </div>
                     <p class="api-endpoint-desc">Download a random valid keybox.xml (Strong &rarr; Device priority)</p>
                     <div class="code-command-box">
-                        <code id="curl-command-text">curl -L -o keybox.xml <span id="api-download-full-url">http://localhost:8000/api/download</span></code>
+                        <code
+                            id="curl-command-text">curl -L -o keybox.xml <span id="api-download-full-url">http://localhost:8000/api/download</span></code>
                         <button class="btn-copy-code" id="btn-copy-curl" title="Copy command" type="button">
                             <i class="fa-solid fa-copy"></i>
                             <span class="copy-text">Copy</span>
@@ -282,14 +315,16 @@
                     </div>
                     <div class="sources-pic-titles">
                         <h2 class="sources-pic-title">Community sources</h2>
-                        <p class="sources-pic-subtitle">Scanned every hour. Imports both Strong &amp; Device keys, skips duplicates automatically.</p>
+                        <p class="sources-pic-subtitle">Scanned every hour. Imports both Strong &amp; Device keys, skips
+                            duplicates automatically.</p>
                     </div>
                 </div>
                 <div class="sources-pic-header-right">
                     <button id="btn-run-sources-scraper" class="sources-pic-scan-btn" type="button">
                         <i class="fa-solid fa-rotate"></i> Scan sources now
                     </button>
-                    <button class="sources-pic-close-btn" id="btn-close-sources-modal" type="button" aria-label="Close Modal">&times;</button>
+                    <button class="sources-pic-close-btn" id="btn-close-sources-modal" type="button"
+                        aria-label="Close Modal">&times;</button>
                 </div>
             </div>
 
@@ -328,11 +363,13 @@
                 <details class="sources-pic-log-details">
                     <summary class="sources-pic-log-summary">
                         <span><i class="fa-solid fa-terminal"></i> Activity Log</span>
-                        <button id="btn-clear-sources-logs" class="btn-clear-logs-mini" type="button" title="Clear log">Clear</button>
+                        <button id="btn-clear-sources-logs" class="btn-clear-logs-mini" type="button"
+                            title="Clear log">Clear</button>
                     </summary>
                     <div id="sources-log-console" class="sources-pic-log-console">
                         <div id="sources-log-list" class="log-entries-list">
-                            <div class="log-entry info"><span class="log-tag info">INFO</span> Ready to scan community sources.</div>
+                            <div class="log-entry info"><span class="log-tag info">INFO</span> Ready to scan community
+                                sources.</div>
                         </div>
                     </div>
                 </details>
@@ -346,7 +383,8 @@
             style="max-width: 620px; width: 92%; max-height: 85vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; border: 1px solid var(--border-color); box-shadow: var(--shadow-lg);">
             <div class="modal-header"
                 style="padding: 16px 20px; border-bottom: 1px solid var(--border-color); flex-shrink: 0; display: flex; justify-content: space-between; align-items: center;">
-                <h2 style="margin: 0; font-size: 17px; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                <h2
+                    style="margin: 0; font-size: 17px; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
                     <i class="fa-solid fa-shield-halved" style="color: var(--primary);"></i> Keybox Check Details
                 </h2>
                 <button class="close-btn" onclick="window.closeKeyboxResultModal()" aria-label="Close Modal"

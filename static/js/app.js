@@ -12,15 +12,21 @@
   let activeMethod = 'upload'; // 'upload' | 'paste'
   let cachedKeyboxes = [];
   let sourcesList = [];
+  let activeDownloadMode = 'random'; // 'random' | 'selected'
+  let activeSelectedSerial = null;
+  let downloadConfigLoaded = false;
 
   // Initialize on DOMContentLoaded
-  document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('DOMContentLoaded', async () => {
     initDOM();
     initTheme();
     setupEventListeners();
     loadDashboardStats();
-    loadKeyboxPool();
     loadSourcesConfig();
+
+    // Load download configuration first, then active pool
+    await loadDownloadConfig();
+    await loadKeyboxPool();
 
     // Auto refresh stats and pool every 60 seconds (keeps purge timers live)
     setInterval(() => {
@@ -36,7 +42,7 @@
     DOM.xmlPaste = document.getElementById('keybox-xml-paste');
     DOM.btnReset = document.getElementById('btn-reset-keybox');
     DOM.btnVerify = document.getElementById('btn-verify-keybox');
-    DOM.methodBtns = document.querySelectorAll('.method-btn');
+    DOM.methodBtns = document.querySelectorAll('.input-method-selector [data-method]');
     DOM.methodUploadContainer = document.getElementById('method-upload-container');
     DOM.methodPasteContainer = document.getElementById('method-paste-container');
     DOM.selectedFileInfo = document.getElementById('selected-file-info');
@@ -85,6 +91,14 @@
     // Download Panel Elements
     DOM.btnCopyDownloadUrl = document.getElementById('btn-copy-download-url');
     DOM.btnDirectDownloadAction = document.getElementById('btn-direct-download-action');
+    DOM.downloadModeBtns = document.querySelectorAll('[data-download-mode]');
+    DOM.gridTargetRandomView = document.getElementById('grid-target-random-view');
+    DOM.gridTargetSelectedView = document.getElementById('grid-target-selected-view');
+    DOM.selectDownloadKeybox = document.getElementById('select-download-keybox');
+    DOM.downloadModeBadgeText = document.getElementById('download-mode-badge-text');
+    DOM.downloadHeroDesc = document.getElementById('download-hero-desc');
+    DOM.specLblTarget = document.getElementById('spec-lbl-target');
+    DOM.specValTarget = document.getElementById('spec-val-target');
   }
 
   // ===== Theme Management =====
@@ -284,6 +298,29 @@
         showToast('Initiating keybox.xml download from pool...', 'info');
       });
     }
+
+    // Download Mode Selector
+    if (DOM.downloadModeBtns) {
+      DOM.downloadModeBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const mode = btn.getAttribute('data-download-mode');
+          switchDownloadMode(mode);
+        });
+      });
+    }
+
+    // Selected Keybox Dropdown Change
+    if (DOM.selectDownloadKeybox) {
+      DOM.selectDownloadKeybox.addEventListener('change', () => {
+        const serial = DOM.selectDownloadKeybox.value;
+        if (serial) {
+          activeSelectedSerial = serial;
+          saveDownloadConfig('selected', serial);
+          renderDownloadMode();
+          showToast(`Active download keybox set to SN: ${serial.slice(0, 14)}...`, 'success');
+        }
+      });
+    }
   }
 
   // ===== Method Switching =====
@@ -294,12 +331,140 @@
     });
 
     if (method === 'upload') {
-      DOM.methodUploadContainer.style.display = 'block';
+      DOM.methodUploadContainer.style.display = 'flex';
       DOM.methodPasteContainer.style.display = 'none';
     } else {
       DOM.methodUploadContainer.style.display = 'none';
-      DOM.methodPasteContainer.style.display = 'block';
+      DOM.methodPasteContainer.style.display = 'flex';
       DOM.xmlPaste.focus();
+    }
+  }
+
+  // ===== Download Mode Management =====
+  async function loadDownloadConfig() {
+    try {
+      const res = await fetch('/api/download/config');
+      if (!res.ok) return;
+      const data = await res.json();
+      activeDownloadMode = data.mode || 'random';
+      if (data.selected_serial) {
+        activeSelectedSerial = data.selected_serial;
+      }
+      downloadConfigLoaded = true;
+      populateDownloadKeyboxDropdown();
+      renderDownloadMode();
+    } catch (e) {
+      console.error('Error loading download config:', e);
+      downloadConfigLoaded = true;
+    }
+  }
+
+  async function saveDownloadConfig(mode, serial) {
+    try {
+      activeDownloadMode = mode;
+      if (serial) {
+        activeSelectedSerial = serial;
+      }
+      renderDownloadMode();
+      await fetch('/api/download/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode, selected_serial: serial })
+      });
+    } catch (e) {
+      console.error('Error saving download config:', e);
+    }
+  }
+
+  function switchDownloadMode(mode) {
+    if (mode === activeDownloadMode) return;
+    activeDownloadMode = mode;
+    if (mode === 'selected') {
+      if (!activeSelectedSerial && cachedKeyboxes.length > 0) {
+        const firstValid = cachedKeyboxes.find(kb => kb.status === 'STRONG' || kb.status === 'SOFTBAN') || cachedKeyboxes[0];
+        activeSelectedSerial = firstValid ? firstValid.serial_number : null;
+      }
+      saveDownloadConfig('selected', activeSelectedSerial);
+      showToast('Switched to Selected Keybox mode', 'info');
+    } else {
+      saveDownloadConfig('random', activeSelectedSerial);
+      showToast('Switched to Random Keybox mode', 'info');
+    }
+    populateDownloadKeyboxDropdown();
+    renderDownloadMode();
+  }
+
+  function populateDownloadKeyboxDropdown() {
+    if (!DOM.selectDownloadKeybox) return;
+    if (!cachedKeyboxes || cachedKeyboxes.length === 0) {
+      DOM.selectDownloadKeybox.innerHTML = '<option value="" disabled selected>No keyboxes in pool</option>';
+      return;
+    }
+
+    const sorted = [...cachedKeyboxes].sort((a, b) => {
+      const order = { 'STRONG': 0, 'VALID': 1, 'SOFTBAN': 2, 'REVOKED': 3, 'INVALID': 4 };
+      return (order[a.status] ?? 99) - (order[b.status] ?? 99);
+    });
+
+    // Only if config has loaded and we have an active serial that was deleted from pool, fallback
+    if (downloadConfigLoaded) {
+      const exists = sorted.some(kb => kb.serial_number === activeSelectedSerial);
+      if (!exists && activeSelectedSerial) {
+        // Selected keybox was deleted from pool, fallback to top candidate
+        activeSelectedSerial = sorted[0].serial_number;
+        if (activeDownloadMode === 'selected') {
+          saveDownloadConfig('selected', activeSelectedSerial);
+        }
+      } else if (!activeSelectedSerial && sorted.length > 0) {
+        activeSelectedSerial = sorted[0].serial_number;
+      }
+    }
+
+    DOM.selectDownloadKeybox.innerHTML = sorted.map(kb => {
+      const sn = kb.serial_number || 'Unknown';
+      const status = (kb.status || 'UNKNOWN').toUpperCase();
+      const dev = kb.device_id || 'Unknown';
+      const root = kb.root_name || kb.root_type || 'Root';
+      const isSelected = activeSelectedSerial === sn;
+      const statusTag = status === 'STRONG' ? 'STRONG' : (status === 'SOFTBAN' ? 'SOFTBAN' : (status === 'REVOKED' ? 'REVOKED' : 'INVALID'));
+      return `<option value="${escapeHtml(sn)}" ${isSelected ? 'selected' : ''}>[${statusTag}] SN: ${escapeHtml(sn)} - ${escapeHtml(dev)} (${escapeHtml(root)})</option>`;
+    }).join('');
+
+    if (activeSelectedSerial) {
+      DOM.selectDownloadKeybox.value = activeSelectedSerial;
+    }
+  }
+
+  function renderDownloadMode() {
+    if (DOM.downloadModeBtns) {
+      DOM.downloadModeBtns.forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-download-mode') === activeDownloadMode);
+      });
+    }
+
+    if (activeDownloadMode === 'random') {
+      if (DOM.gridTargetRandomView) DOM.gridTargetRandomView.style.display = 'block';
+      if (DOM.gridTargetSelectedView) DOM.gridTargetSelectedView.style.display = 'none';
+      if (DOM.downloadHeroDesc) DOM.downloadHeroDesc.textContent = 'Random valid keybox with Strong / Hardware Google root priority';
+      if (DOM.downloadModeBadgeText) DOM.downloadModeBadgeText.textContent = 'Random Priority';
+      if (DOM.specLblTarget) DOM.specLblTarget.textContent = 'Integrity Status';
+      if (DOM.specValTarget) {
+        DOM.specValTarget.className = 'spec-value valid';
+        DOM.specValTarget.innerHTML = '<i class="fa-solid fa-shield-check"></i> Strong Priority';
+      }
+    } else {
+      if (DOM.gridTargetRandomView) DOM.gridTargetRandomView.style.display = 'none';
+      if (DOM.gridTargetSelectedView) DOM.gridTargetSelectedView.style.display = 'block';
+
+      const selectedKb = cachedKeyboxes.find(k => k.serial_number === activeSelectedSerial);
+      if (selectedKb) {
+        if (DOM.downloadHeroDesc) DOM.downloadHeroDesc.textContent = `Serving keybox SN: ${selectedKb.serial_number} (${selectedKb.device_id || 'Unknown'})`;
+        const snShort = selectedKb.serial_number.length > 12 ? `${selectedKb.serial_number.slice(0, 10)}...` : selectedKb.serial_number;
+        if (DOM.downloadModeBadgeText) DOM.downloadModeBadgeText.textContent = `Selected: ${snShort}`;
+      } else {
+        if (DOM.downloadHeroDesc) DOM.downloadHeroDesc.textContent = 'Select a keybox from pool to serve via /api/download';
+        if (DOM.downloadModeBadgeText) DOM.downloadModeBadgeText.textContent = 'Pick a Keybox';
+      }
     }
   }
 
@@ -563,6 +728,8 @@
       if (DOM.valPoolCount) DOM.valPoolCount.textContent = cachedKeyboxes.length;
 
       if (cachedKeyboxes.length === 0) {
+        populateDownloadKeyboxDropdown();
+        renderDownloadMode();
         DOM.poolGridContainer.innerHTML = `
           <div class="pool-empty-state">
             <i class="fa-solid fa-box-open"></i>
@@ -572,6 +739,9 @@
         `;
         return;
       }
+
+      populateDownloadKeyboxDropdown();
+      renderDownloadMode();
 
       DOM.poolGridContainer.innerHTML = cachedKeyboxes.map(kb => {
         const rawStatus = (kb.status || 'UNKNOWN').toUpperCase();
@@ -622,6 +792,11 @@
         }
         const sizeBadge = sizeText ? ` <span class="btn-size-tag">(${escapeHtml(sizeText)})</span>` : '';
         const displayRoot = kb.root_name || kb.root_type || 'Root';
+        const rawSourceName = (kb.source || 'Web Verification').trim();
+        const isWeb = rawSourceName.toLowerCase().includes('web') || rawSourceName.toLowerCase().includes('upload');
+        const isSpecter = rawSourceName.toLowerCase().includes('specter') || rawSourceName.toLowerCase().includes('catalog');
+        const sourceIcon = isWeb ? 'fa-arrow-up-from-bracket' : (isSpecter ? 'fa-layer-group' : 'fa-globe');
+        const displaySource = rawSourceName;
 
         return `
           <div class="keybox-pool-card glass-panel">
@@ -646,7 +821,14 @@
               </div>
               <div class="meta-item" style="grid-column: span 2;">
                 <span class="meta-label">Serial Number</span>
-                <span class="meta-value" style="color: var(--accent); font-family: var(--font-mono); font-size: 0.75rem;">${escapeHtml(kb.serial_number || 'N/A')}</span>
+                <span class="meta-value" style="color: var(--accent); font-family: var(--font-mono); font-size: 0.75rem;" title="${escapeHtml(kb.serial_number || 'N/A')}">${escapeHtml(kb.serial_number || 'N/A')}</span>
+              </div>
+              <div class="meta-item" style="grid-column: span 2;">
+                <span class="meta-label">Source</span>
+                <span class="meta-value" title="${escapeHtml(kb.source_url ? `${displaySource} (${kb.source_url})` : displaySource)}" style="display: flex; align-items: center; gap: 5px;">
+                  <i class="fa-solid ${sourceIcon}" style="font-size: 0.7rem; color: var(--accent); flex-shrink: 0;"></i>
+                  <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(displaySource)}</span>
+                </span>
               </div>
             </div>
 

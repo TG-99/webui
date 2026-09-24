@@ -8,6 +8,7 @@ import json
 import re
 import base64
 import hashlib
+import random
 import xml.etree.ElementTree as ET
 from urllib.parse import urlparse
 from contextlib import asynccontextmanager
@@ -94,6 +95,7 @@ def init_db():
         db.keyboxes.create_index("serial_number", unique=True)
         db.keyboxes.create_index("created_at")
         db.keyboxes.create_index("status")
+        db.scraper_config.update_many({}, {"$unset": {"last_results": ""}})
         logger.info("Keybox collections and indexes initialized successfully.")
     except Exception as e:
         logger.error(f"Error initializing MongoDB database: {e}")
@@ -720,9 +722,10 @@ def build_keybox_record(
         detected_revoked_at = (existing.get("detected_revoked_at") if existing else None) or now_str
 
     created_at = (existing.get("created_at") if existing else None) or now_str
+    device_id = (existing.get("device_id") if (existing and existing.get("device_id")) else None) or res.get("deviceId", "Unknown")
 
     doc = {
-        "device_id": res.get("deviceId", "Unknown"),
+        "device_id": device_id,
         "serial_number": serial,
         "algorithm": res.get("algorithm", "RSA/ECDSA"),
         "root_type": res.get("rootType", "Attestation Root"),
@@ -739,10 +742,12 @@ def build_keybox_record(
         "last_checked_at": now_str,
         "status": status_str,
         "detected_revoked_at": detected_revoked_at,
-        "source": source
+        "source": (existing.get("source") if (existing and existing.get("source")) else None) or source
     }
     if source_url:
         doc["source_url"] = source_url
+    elif existing and existing.get("source_url"):
+        doc["source_url"] = existing.get("source_url")
     return doc
 
 def migrate_existing_keyboxes_to_base64():
@@ -1110,9 +1115,22 @@ async def run_sources_keybox_scraper(
                         res = validate_keybox_xml(xml_str)
                         status_str = res.get("status", "INVALID")
                         serial = res.get("serialNumber") or f"url_{abs(hash(url))}_{i}"
+                        is_revoked = res.get("revoked", False) or status_str == "REVOKED"
+                        item_label = f"Keybox #{i}" if len(extracted_xmls) > 1 else "Keybox"
+
+                        # Do not pull revoked keyboxes from sources
+                        if is_revoked:
+                            stats["revoked_or_invalid"] += 1
+                            if name in by_source: by_source[name]["revoked_or_invalid"] += 1
+                            revoke_reason = res.get("revokeReason") or "Google CRL Revoked"
+                            stats["details"].append({
+                                "type": "revoked",
+                                "text": f"{name} ({item_label}): SN {serial} -> REVOKED [{revoke_reason}] (Skipped - Revoked keybox not pulled)"
+                            })
+                            continue
 
                         existing = db.keyboxes.find_one({"serial_number": serial})
-                        doc = build_keybox_record(res, xml_str, now_str, f"Raw URL ({name})", url, existing)
+                        doc = build_keybox_record(res, xml_str, now_str, name, url, existing)
                         db.keyboxes.update_one({"serial_number": serial}, {"$set": doc}, upsert=True)
 
                         if status_str in ["STRONG", "SOFTBAN"]:
@@ -1123,13 +1141,11 @@ async def run_sources_keybox_scraper(
                             if name in by_source: by_source[name]["revoked_or_invalid"] += 1
 
                         reason = ""
-                        if res.get("revoked"): reason = " [Google CRL Revoked]"
-                        elif res.get("isSoftbanned"): reason = f" [{res.get('softbanReason', 'Softbanned')}]"
+                        if res.get("isSoftbanned"): reason = f" [{res.get('softbanReason', 'Softbanned')}]"
                         elif not res.get("certValid"): reason = " [Cert Expired/Invalid]"
                         elif not res.get("chainValid"): reason = " [Chain Invalid]"
                         elif res.get("privateKeyMatch") is False: reason = " [Private Key Mismatch]"
 
-                        item_label = f"Keybox #{i}" if len(extracted_xmls) > 1 else "Keybox"
                         if existing:
                             stats["skipped_existing"] += 1
                             stats["duplicates_found"] += 1
@@ -1145,7 +1161,7 @@ async def run_sources_keybox_scraper(
                             stats["saved_to_db"] += 1
                             if name in by_source: by_source[name]["saved_to_db"] += 1
                             stats["details"].append({
-                                "type": status_str.lower() if status_str in ["STRONG", "SOFTBAN", "REVOKED"] else "invalid",
+                                "type": status_str.lower() if status_str in ["STRONG", "SOFTBAN"] else "invalid",
                                 "text": f"{name} ({item_label}): SN {serial} -> {status_str}{reason} (Saved to DB Pool)"
                             })
                     except Exception as ve:
@@ -1252,7 +1268,10 @@ async def background_sources_scraper_loop():
 
                 db.scraper_config.update_one(
                     {"type": "sources_scraper"},
-                    {"$set": {"type": "sources_scraper", "sources": updated_sources, "last_run_at": now_str, "last_results": results}},
+                    {
+                        "$set": {"type": "sources_scraper", "sources": updated_sources, "last_run_at": now_str},
+                        "$unset": {"last_results": ""}
+                    },
                     upsert=True
                 )
         except Exception as e:
@@ -1303,6 +1322,10 @@ class KeyboxSourcesConfig(BaseModel):
 
 class KeyboxCheckRequest(BaseModel):
     xml_content: str = Field(..., min_length=10)
+
+class DownloadConfigRequest(BaseModel):
+    mode: str = "random"  # "random" | "selected"
+    selected_serial: Optional[str] = None
 
 @app.get("/api/stats")
 def api_get_stats():
@@ -1367,6 +1390,8 @@ def api_check_keybox(req: KeyboxCheckRequest):
                 is_duplicate = True
                 first_added = existing.get("created_at") or "previously"
                 duplicate_warning = f"Duplicate Keybox: Serial '{serial}' is already present in your pool (First added: {first_added}). Status has been updated."
+                if existing.get("device_id"):
+                    res["deviceId"] = existing.get("device_id")
 
             doc = build_keybox_record(res, req.xml_content, now_str, "Web Verification", None, existing)
             db.keyboxes.update_one({"serial_number": serial}, {"$set": doc}, upsert=True)
@@ -1419,20 +1444,90 @@ def api_get_keyboxes():
         logger.error(f"Error fetching keyboxes: {e}")
         raise HTTPException(status_code=500, detail="Internal server error fetching keyboxes")
 
-@app.get("/api/download")
-def api_download_random_valid_keybox():
-    """Download a random keybox.xml (Strong -> SoftBan / Device priority). Decodes Base64 on the fly."""
+@app.get("/api/download/config")
+def api_get_download_config():
+    """Gets current download configuration (mode: 'random' | 'selected', selected_serial)."""
     try:
-        candidates = list(db.keyboxes.find({"status": "STRONG"}))
-        if not candidates:
-            candidates = list(db.keyboxes.find({"status": {"$in": ["SOFTBAN", "VALID"]}}))
-        if not candidates:
-            candidates = list(db.keyboxes.find())
-        if not candidates:
-            raise HTTPException(status_code=404, detail="No keybox available in database pool.")
+        cfg = db.scraper_config.find_one({"type": "download_config"}) or {}
+        mode = cfg.get("mode", "random")
+        selected_serial = cfg.get("selected_serial")
+        selected_kb_info = None
+        if mode == "selected" and selected_serial:
+            kb = db.keyboxes.find_one({"serial_number": selected_serial})
+            if kb:
+                selected_kb_info = {
+                    "serial_number": kb.get("serial_number"),
+                    "device_id": kb.get("device_id", "Unknown"),
+                    "status": kb.get("status", "UNKNOWN"),
+                    "root_type": kb.get("root_type", "Unknown")
+                }
+            else:
+                # Fallback if keybox was deleted
+                mode = "random"
+                selected_serial = None
 
-        import random
-        chosen = random.choice(candidates)
+        return {
+            "mode": mode,
+            "selected_serial": selected_serial,
+            "selected_keybox": selected_kb_info
+        }
+    except Exception as e:
+        logger.error(f"Error getting download config: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/download/config")
+def api_set_download_config(req: DownloadConfigRequest):
+    """Sets download configuration (mode: 'random' | 'selected', selected_serial)."""
+    try:
+        mode = req.mode if req.mode in ["random", "selected"] else "random"
+        selected_serial = req.selected_serial
+
+        if mode == "selected" and selected_serial:
+            kb = db.keyboxes.find_one({"serial_number": selected_serial})
+            if not kb:
+                raise HTTPException(status_code=404, detail=f"Keybox with serial '{selected_serial}' not found in pool.")
+
+        update_fields = {"type": "download_config", "mode": mode}
+        if selected_serial is not None:
+            update_fields["selected_serial"] = selected_serial
+
+        db.scraper_config.update_one(
+            {"type": "download_config"},
+            {"$set": update_fields},
+            upsert=True
+        )
+        return {"success": True, "mode": mode, "selected_serial": selected_serial}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error setting download config: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/download")
+def api_download_keybox():
+    """Download keybox.xml based on current mode ('random' or 'selected'). Decodes Base64 on the fly."""
+    try:
+        cfg = db.scraper_config.find_one({"type": "download_config"}) or {}
+        mode = cfg.get("mode", "random")
+        selected_serial = cfg.get("selected_serial")
+
+        chosen = None
+        if mode == "selected" and selected_serial:
+            chosen = db.keyboxes.find_one({"serial_number": selected_serial})
+
+        if not chosen:
+            # Fallback to random candidate (Strong -> SoftBan / Valid priority)
+            for query in [{"status": "STRONG"}, {"status": {"$in": ["SOFTBAN", "VALID"]}}, {}]:
+                count = db.keyboxes.count_documents(query)
+                if count > 0:
+                    rand_offset = random.randint(0, count - 1)
+                    chosen = next(db.keyboxes.find(query).skip(rand_offset).limit(1), None)
+                    if chosen:
+                        break
+
+            if not chosen:
+                raise HTTPException(status_code=404, detail="No keybox available in database pool.")
+
         raw_xml_content = chosen.get("xml_content", "")
         if not raw_xml_content:
             raise HTTPException(status_code=404, detail="Keybox XML content is empty.")
@@ -1445,17 +1540,18 @@ def api_download_random_valid_keybox():
             media_type="application/xml",
             headers={
                 "Content-Disposition": 'attachment; filename="keybox.xml"',
+                "X-Keybox-Mode": str(mode),
                 "X-Keybox-Serial": str(serial),
                 "X-Keybox-Device": str(chosen.get("device_id", "Unknown")),
                 "X-Keybox-Root": str(chosen.get("root_type", "Unknown")),
                 "X-Keybox-Status": str(chosen.get("status", "Unknown")),
-                "Access-Control-Expose-Headers": "Content-Disposition, X-Keybox-Serial, X-Keybox-Device, X-Keybox-Root, X-Keybox-Status"
+                "Access-Control-Expose-Headers": "Content-Disposition, X-Keybox-Mode, X-Keybox-Serial, X-Keybox-Device, X-Keybox-Root, X-Keybox-Status"
             }
         )
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error downloading random valid keybox: {e}")
+        logger.error(f"Error downloading keybox: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/keybox/download/{serial_number}")
@@ -1495,6 +1591,15 @@ def api_delete_keybox(serial_number: str):
         result = db.keyboxes.delete_one({"serial_number": serial_number})
         if result.deleted_count == 0:
             raise HTTPException(status_code=404, detail="Keybox not found")
+
+        # If deleted keybox was selected in download config, reset to random mode
+        cfg = db.scraper_config.find_one({"type": "download_config"})
+        if cfg and cfg.get("selected_serial") == serial_number:
+            db.scraper_config.update_one(
+                {"type": "download_config"},
+                {"$set": {"mode": "random", "selected_serial": None}}
+            )
+
         return {"success": True, "message": "Keybox deleted successfully."}
     except HTTPException:
         raise
@@ -1540,7 +1645,10 @@ async def api_run_sources_scraper(req: KeyboxSourcesScrapeRequest):
 
         db.scraper_config.update_one(
             {"type": "sources_scraper"},
-            {"$set": {"type": "sources_scraper", "sources": list(updated_sources_map.values()), "last_run_at": now_str, "last_results": results}},
+            {
+                "$set": {"type": "sources_scraper", "sources": list(updated_sources_map.values()), "last_run_at": now_str},
+                "$unset": {"last_results": ""}
+            },
             upsert=True
         )
         return {"success": True, "results": results}
