@@ -1080,6 +1080,10 @@ html.light-theme .grid-keybox-dropdown option {
   flex-shrink: 0;
 }
 
+.status-pill i {
+  font-size: 0.68rem;
+}
+
 .status-pill.strong,
 .status-pill.valid {
   background: rgba(16, 185, 129, 0.15);
@@ -1099,6 +1103,13 @@ html.light-theme .grid-keybox-dropdown option {
   background: rgba(239, 68, 68, 0.18);
   color: var(--danger);
   border: 1px solid rgba(239, 68, 68, 0.38);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.15);
+}
+
+.status-pill.expired {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.4);
   box-shadow: 0 0 10px rgba(239, 68, 68, 0.15);
 }
 
@@ -1176,26 +1187,36 @@ html.light-theme .grid-keybox-dropdown option {
 .card-actions-row {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 6px;
   border-top: 1px solid var(--border-color);
   padding-top: 10px;
   width: 100%;
+  margin-top: auto;
+  flex-wrap: nowrap;
 }
 
 .card-action-btn {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--border-color);
   color: var(--text-muted);
-  padding: 5px 12px;
+  height: 28px;
+  padding: 0 10px;
   border-radius: var(--radius-sm);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 600;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 5px;
+  white-space: nowrap;
+  min-width: 0;
+  box-sizing: border-box;
   transition: all var(--transition-fast);
+}
+
+.card-action-btn i {
+  font-size: 0.65rem;
 }
 
 .card-action-btn:hover {
@@ -1203,19 +1224,74 @@ html.light-theme .grid-keybox-dropdown option {
   background: rgba(255, 255, 255, 0.1);
 }
 
+.card-action-btn.details-btn {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  justify-content: center;
+  font-size: 0.60rem;
+  color: #a5b4fc;
+  background: rgba(99, 102, 241, 0.1);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.card-action-btn.details-btn i {
+  font-size: 0.60rem;
+  line-height: 1;
+}
+
+.card-action-btn.details-btn:hover {
+  color: #ffffff;
+  border-color: rgba(99, 102, 241, 0.7);
+  background: rgba(99, 102, 241, 0.25);
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.25);
+}
+
+.card-action-btn.copy-btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: center;
+}
+
 .card-action-btn.copy-btn:hover {
   color: #38bdf8;
   border-color: rgba(56, 189, 248, 0.4);
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.card-action-btn.download-btn {
+  flex: 1.2 1 auto;
+  min-width: 0;
+  justify-content: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .card-action-btn.download-btn:hover {
   color: var(--accent);
   border-color: var(--accent);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.card-action-btn.delete-btn {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  justify-content: center;
+  font-size: 0.65rem;
+}
+
+.card-action-btn.delete-btn i {
+  font-size: 0.65rem;
+  line-height: 1;
 }
 
 .card-action-btn.delete-btn:hover {
   color: var(--danger);
   border-color: var(--danger);
+  background: rgba(239, 68, 68, 0.08);
 }
 
 .card-action-btn.copied {
@@ -1378,6 +1454,12 @@ html.light-theme .grid-keybox-dropdown option {
   background: rgba(239, 68, 68, 0.15);
   border: 1px solid rgba(239, 68, 68, 0.4);
   color: var(--danger);
+}
+
+.result-status-banner.expired {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
 }
 
 .result-status-banner.invalid {
@@ -2254,9 +2336,23 @@ html.light-theme .modal-overlay {
   }
 
   .card-action-btn {
-    padding: 6px 8px;
-    font-size: 0.74rem;
+    height: 26px;
+    padding: 0 8px;
+    font-size: 0.72rem;
     white-space: nowrap;
+  }
+
+  .card-action-btn.details-btn {
+    flex: 0 0 26px;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    justify-content: center;
+    font-size: 0.58rem;
+  }
+
+  .card-action-btn.details-btn i {
+    font-size: 0.58rem;
   }
 
   .card-action-btn.copy-btn {
@@ -2266,7 +2362,7 @@ html.light-theme .modal-overlay {
   }
 
   .card-action-btn.download-btn {
-    flex: 1.3 1 auto;
+    flex: 1.2 1 auto;
     min-width: 0;
     justify-content: center;
     overflow: hidden;
@@ -2274,11 +2370,16 @@ html.light-theme .modal-overlay {
   }
 
   .card-action-btn.delete-btn {
-    flex: 0 0 32px;
-    width: 32px;
-    height: 31px;
+    flex: 0 0 26px;
+    width: 26px;
+    height: 26px;
     padding: 0;
     justify-content: center;
+    font-size: 0.60rem;
+  }
+
+  .card-action-btn.delete-btn i {
+    font-size: 0.60rem;
   }
 
   /* Single Checker Portal */
@@ -2483,10 +2584,24 @@ html.light-theme .modal-overlay {
   }
 
   .card-action-btn {
-    padding: 6px 6px;
-    font-size: 0.72rem;
+    height: 25px;
+    padding: 0 6px;
+    font-size: 0.70rem;
     gap: 4px;
     white-space: nowrap;
+  }
+
+  .card-action-btn.details-btn {
+    flex: 0 0 25px;
+    width: 25px;
+    height: 25px;
+    padding: 0;
+    justify-content: center;
+    font-size: 0.55rem;
+  }
+
+  .card-action-btn.details-btn i {
+    font-size: 0.55rem;
   }
 
   .card-action-btn.copy-btn {
@@ -2496,7 +2611,7 @@ html.light-theme .modal-overlay {
   }
 
   .card-action-btn.download-btn {
-    flex: 1.3 1 auto;
+    flex: 1.2 1 auto;
     min-width: 0;
     justify-content: center;
     overflow: hidden;
@@ -2504,11 +2619,16 @@ html.light-theme .modal-overlay {
   }
 
   .card-action-btn.delete-btn {
-    flex: 0 0 30px;
-    width: 30px;
-    height: 30px;
+    flex: 0 0 25px;
+    width: 25px;
+    height: 25px;
     padding: 0;
     justify-content: center;
+    font-size: 0.58rem;
+  }
+
+  .card-action-btn.delete-btn i {
+    font-size: 0.58rem;
   }
 
   .sources-pic-header-right {

@@ -233,9 +233,16 @@
       });
     }
 
-    // Event Delegation for Pool Cards (Download, Delete, Copy)
+    // Event Delegation for Pool Cards (Check Details, Download, Delete, Copy)
     if (DOM.poolGridContainer) {
       DOM.poolGridContainer.addEventListener('click', (e) => {
+        const detailsBtn = e.target.closest('[data-action="view-details"]');
+        if (detailsBtn) {
+          const serial = detailsBtn.getAttribute('data-serial');
+          if (serial) showKeyboxCheckDetails(serial, detailsBtn);
+          return;
+        }
+
         const copyXmlBtn = e.target.closest('[data-action="copy-xml"]');
         if (copyXmlBtn) {
           const serial = copyXmlBtn.getAttribute('data-serial');
@@ -523,10 +530,12 @@
 
       if (data.is_duplicate) {
         showToast(`⚠️ Duplicate Keybox: Already present in active pool (${data.status}).`, 'warning');
-      } else if (data.success) {
+      } else if (data.saved) {
         showToast('Keybox verified & saved to active pool!', 'success');
+      } else if (data.success) {
+        showToast(`Keybox verified (${data.status})!`, 'success');
       } else {
-        showToast('Keybox is INVALID or REVOKED!', 'error');
+        showToast(`Keybox is ${data.status || 'INVALID / REVOKED'} (Not saved to pool)`, 'error');
       }
 
       loadDashboardStats();
@@ -547,11 +556,12 @@
   function renderKeyboxResults(res) {
     if (!DOM.resultContainer) return;
 
-    const status = (res.status || 'INVALID').toUpperCase();
+    const isCertExpired = res.certExpired === true || res.isExpired === true || (res.status || '').toUpperCase() === 'EXPIRED';
+    const status = isCertExpired ? 'EXPIRED' : (res.status || 'INVALID').toUpperCase();
     let statusClass = 'invalid';
-    let statusLabel = 'INVALID / EXPIRED';
+    let statusLabel = 'INVALID KEYBOX';
     let statusIcon = 'fa-circle-xmark';
-    let statusSub = res.integrityVerdict || 'Corrupted XML, expired certificate or broken chain';
+    let statusSub = res.integrityVerdict || 'Corrupted XML, broken chain or invalid certificate';
 
     if (status === 'STRONG') {
       statusClass = 'strong';
@@ -568,6 +578,11 @@
       statusLabel = 'REVOKED (BLACKLISTED)';
       statusIcon = 'fa-ban';
       statusSub = res.revokeReason || 'Revoked in Google Attestation CRL status list';
+    } else if (status === 'EXPIRED' || isCertExpired) {
+      statusClass = 'expired';
+      statusLabel = 'EXPIRED CERTIFICATE';
+      statusIcon = 'fa-clock-rotate-left';
+      statusSub = res.integrityVerdict || 'Certificate validity period has expired';
     }
 
     const duplicateWarningHtml = res.isDuplicate ? `
@@ -594,9 +609,11 @@
         ? '<span style="color: var(--warning); font-weight: 700;"><i class="fa-solid fa-triangle-exclamation"></i> AOSP Test Root (Basic Device Integrity Only)</span>'
         : '<span style="color: var(--danger); font-weight: 700;"><i class="fa-solid fa-circle-xmark"></i> Untrusted Root Authority (Play Integrity will not trust non-Google root)</span>';
 
-    const daysLeftHtml = (res.daysLeft !== undefined && res.daysLeft !== null) 
-      ? `<span style="color: ${res.isExpiringSoon ? 'var(--warning)' : 'var(--success)'}; font-weight: 700;">${res.daysLeft} days remaining</span> ${res.isExpiringSoon ? '<span class="status-pill softban" style="font-size: 0.68rem; padding: 1px 6px; margin-left: 4px;">Expiring Soon</span>' : ''}` 
-      : 'N/A';
+    const daysLeftHtml = isCertExpired
+      ? '<span style="color: var(--danger); font-weight: 700;">Certificate Expired</span> <span class="status-pill expired" style="font-size: 0.68rem; padding: 1px 6px; margin-left: 4px;">Expired</span>'
+      : (res.daysLeft !== undefined && res.daysLeft !== null) 
+        ? `<span style="color: ${res.isExpiringSoon ? 'var(--warning)' : 'var(--success)'}; font-weight: 700;">${res.daysLeft} days remaining</span> ${res.isExpiringSoon ? '<span class="status-pill softban" style="font-size: 0.68rem; padding: 1px 6px; margin-left: 4px;">Expiring Soon</span>' : ''}` 
+        : 'N/A';
 
     const privKeyHtml = res.privateKeyMatch === true
       ? '<span style="color: var(--success); font-weight: 700;"><i class="fa-solid fa-check"></i> MATCHED (SPKI Verified)</span>'
@@ -612,7 +629,7 @@
       <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; margin-top: 8px; font-size: 0.78rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
           <span style="font-weight: 700; color: var(--text-main);">Cert Level ${c.level} (SN: <code style="color: var(--accent);">${escapeHtml(c.serialNumber)}</code>)</span>
-          <span class="status-pill ${c.isValid ? 'strong' : 'invalid'}" style="font-size: 0.68rem; padding: 2px 6px;">${c.isValid ? 'VALID' : 'EXPIRED'}</span>
+          <span class="status-pill ${c.isValid ? 'strong' : 'expired'}" style="font-size: 0.68rem; padding: 2px 6px;">${c.isValid ? 'VALID' : 'EXPIRED'}</span>
         </div>
         <div style="color: var(--text-muted); margin-top: 2px;">Subject: <span style="font-family: var(--font-mono); color: var(--text-main); font-size: 0.74rem;">${escapeHtml(c.subject)}</span></div>
         <div style="color: var(--text-muted); margin-top: 2px;">Issuer: <span style="font-family: var(--font-mono); color: var(--text-muted); font-size: 0.74rem;">${escapeHtml(c.issuer)}</span></div>
@@ -761,9 +778,13 @@
           statusClass = 'revoked';
           statusIcon = 'fa-ban';
           statusText = 'REVOKED';
+        } else if (rawStatus === 'EXPIRED' || kb.is_expired || kb.cert_expired) {
+          statusClass = 'expired';
+          statusIcon = 'fa-clock-rotate-left';
+          statusText = 'EXPIRED';
         }
 
-        const isExpiring = (rawStatus === 'REVOKED' || rawStatus === 'INVALID');
+        const isExpiring = (rawStatus === 'REVOKED' || rawStatus === 'EXPIRED' || rawStatus === 'INVALID');
         const countdownInfo = isExpiring ? getPurgeCountdownInfo(kb.detected_revoked_at, kb.created_at) : null;
         const countdownPillHtml = countdownInfo ? `
           <span class="purge-countdown-pill ${countdownInfo.urgent ? 'urgent' : ''}" title="Auto-purged 24 hours after detection (Detected: ${escapeHtml(formatDateTime12Hour(kb.detected_revoked_at || kb.created_at))})">
@@ -833,6 +854,9 @@
             </div>
 
             <div class="card-actions-row">
+              <button class="card-action-btn details-btn" title="View Keybox Check Details" data-action="view-details" data-serial="${escapeHtml(kb.serial_number)}">
+                <i class="fa-solid fa-shield-halved"></i>
+              </button>
               <button class="card-action-btn copy-btn" title="Copy Keybox XML" data-action="copy-xml" data-serial="${escapeHtml(kb.serial_number)}">
                 <i class="fa-solid fa-copy"></i> Copy XML
               </button>
@@ -981,6 +1005,31 @@
       loadKeyboxPool();
     } catch (e) {
       showToast(e.message || 'Error deleting keybox.', 'error');
+    }
+  }
+
+  async function showKeyboxCheckDetails(serialNumber, buttonEl) {
+    let originalHtml = '';
+    if (buttonEl) {
+      originalHtml = buttonEl.innerHTML;
+      buttonEl.disabled = true;
+      buttonEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+    }
+
+    try {
+      const res = await fetch(`/api/keyboxes/${encodeURIComponent(serialNumber)}/check`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to fetch keybox check details.');
+
+      renderKeyboxResults(data.result);
+      if (DOM.resultModal) DOM.resultModal.classList.add('active');
+    } catch (e) {
+      showToast(e.message || 'Failed to inspect keybox check details.', 'error');
+    } finally {
+      if (buttonEl) {
+        buttonEl.disabled = false;
+        buttonEl.innerHTML = originalHtml;
+      }
     }
   }
 

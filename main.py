@@ -566,6 +566,8 @@ def validate_keybox_xml(xml_content: str) -> Dict[str, Any]:
     earliest_not_after = min(v["not_after"] for v in validity_list)
     now_utc_dt = datetime.datetime.now(datetime.timezone.utc)
     days_left = (earliest_not_after - now_utc_dt).total_seconds() / 86400.0
+    is_expired = any_expired or (days_left <= 0)
+    is_expiring_soon = (0 < days_left <= 14) and not is_expired
 
     # 5. CRL Verification
     rev_info = check_revocation_status_advanced(certs)
@@ -577,15 +579,16 @@ def validate_keybox_xml(xml_content: str) -> Dict[str, Any]:
     is_softbanned = softban_info["is_softbanned"]
     softban_reason = softban_info["reason"]
 
-    # 7. Classification Status: "STRONG" | "SOFTBAN" | "REVOKED" | "INVALID"
+    # 7. Classification Status: "STRONG" | "SOFTBAN" | "REVOKED" | "EXPIRED" | "INVALID"
     if revoked:
         status = "REVOKED"
         integrity_verdict = "Revoked in Google CRL"
-    elif any_expired or (not chain_valid) or (private_key_match is False):
+    elif is_expired:
+        status = "EXPIRED"
+        integrity_verdict = "Expired Certificate Chain"
+    elif (not chain_valid) or (private_key_match is False):
         status = "INVALID"
-        if any_expired:
-            integrity_verdict = "Expired Certificate Chain"
-        elif not chain_valid:
+        if not chain_valid:
             integrity_verdict = "Broken Certificate Chain Signature"
         elif private_key_match is False:
             integrity_verdict = "Private Key Mismatched from Leaf Certificate"
@@ -643,8 +646,9 @@ def validate_keybox_xml(xml_content: str) -> Dict[str, Any]:
         "algorithm": algorithm,
         "serialNumber": serial_number_hex,
         "subject": subject_str,
-        "certValid": all_valid,
-        "certExpired": any_expired,
+        "certValid": all_valid and not is_expired,
+        "certExpired": is_expired,
+        "isExpired": is_expired,
         "privateKeyMatch": private_key_match,
         "chainValid": chain_valid,
         "brokenLinksCount": chain_report["broken_count"],
@@ -653,8 +657,8 @@ def validate_keybox_xml(xml_content: str) -> Dict[str, Any]:
         "rootInfo": root_info,
         "isGoogleRoot": is_google_root,
         "expiresAt": earliest_not_after.strftime("%Y-%m-%d %H:%M:%S UTC"),
-        "daysLeft": max(0, int(days_left)),
-        "isExpiringSoon": days_left <= 14,
+        "daysLeft": 0 if is_expired else max(0, int(days_left)),
+        "isExpiringSoon": is_expiring_soon,
         "certCount": len(certs),
         "revoked": revoked,
         "revokeReason": revoke_reason,
@@ -715,7 +719,7 @@ def build_keybox_record(
     """Constructs uniform MongoDB update payload for a validated keybox."""
     status_str = res.get("status", "INVALID")
     serial = res.get("serialNumber") or "unknown"
-    is_revoked_or_invalid = status_str in ["REVOKED", "INVALID"]
+    is_revoked_or_invalid = status_str in ["REVOKED", "EXPIRED", "INVALID"]
 
     detected_revoked_at = None
     if is_revoked_or_invalid:
@@ -773,7 +777,7 @@ def purge_expired_revoked_keyboxes() -> int:
         cutoff_str = cutoff.isoformat()
 
         query = {
-            "status": {"$in": ["REVOKED", "INVALID"]},
+            "status": {"$in": ["REVOKED", "EXPIRED", "INVALID"]},
             "$or": [
                 {"detected_revoked_at": {"$lte": cutoff_str}},
                 {"detected_revoked_at": None, "created_at": {"$lte": cutoff_str}}
@@ -809,6 +813,7 @@ def recheck_all_keyboxes() -> dict:
                 if status_str == "STRONG": counts["strong"] += 1
                 elif status_str == "SOFTBAN": counts["softban"] += 1
                 elif status_str == "REVOKED": counts["revoked"] += 1
+                elif status_str == "EXPIRED": counts["invalid"] += 1
                 else: counts["invalid"] += 1
 
                 doc = build_keybox_record(res, xml_content, now_str, kb.get("source", "Stored"), kb.get("source_url"), kb)
@@ -1116,16 +1121,33 @@ async def run_sources_keybox_scraper(
                         status_str = res.get("status", "INVALID")
                         serial = res.get("serialNumber") or f"url_{abs(hash(url))}_{i}"
                         is_revoked = res.get("revoked", False) or status_str == "REVOKED"
+                        is_valid = status_str in ["STRONG", "SOFTBAN"] and not is_revoked
                         item_label = f"Keybox #{i}" if len(extracted_xmls) > 1 else "Keybox"
 
-                        # Do not pull revoked keyboxes from sources
-                        if is_revoked:
+                        # Do not pull revoked, invalid, or expired keyboxes from sources
+                        if not is_valid:
                             stats["revoked_or_invalid"] += 1
                             if name in by_source: by_source[name]["revoked_or_invalid"] += 1
-                            revoke_reason = res.get("revokeReason") or "Google CRL Revoked"
+                            if is_revoked:
+                                revoke_reason = res.get("revokeReason") or "Google CRL Revoked"
+                                reason_text = f"REVOKED [{revoke_reason}]"
+                                item_type = "revoked"
+                            elif res.get("certExpired") or not res.get("certValid"):
+                                reason_text = "INVALID [Cert Expired/Invalid]"
+                                item_type = "invalid"
+                            elif not res.get("chainValid"):
+                                reason_text = "INVALID [Chain Invalid]"
+                                item_type = "invalid"
+                            elif res.get("privateKeyMatch") is False:
+                                reason_text = "INVALID [Private Key Mismatch]"
+                                item_type = "invalid"
+                            else:
+                                reason_text = f"INVALID [{res.get('integrityVerdict', 'Invalid')}]"
+                                item_type = "invalid"
+
                             stats["details"].append({
-                                "type": "revoked",
-                                "text": f"{name} ({item_label}): SN {serial} -> REVOKED [{revoke_reason}] (Skipped - Revoked keybox not pulled)"
+                                "type": item_type,
+                                "text": f"{name} ({item_label}): SN {serial} -> {reason_text} (Skipped - Not saved to pool)"
                             })
                             continue
 
@@ -1133,18 +1155,11 @@ async def run_sources_keybox_scraper(
                         doc = build_keybox_record(res, xml_str, now_str, name, url, existing)
                         db.keyboxes.update_one({"serial_number": serial}, {"$set": doc}, upsert=True)
 
-                        if status_str in ["STRONG", "SOFTBAN"]:
-                            stats["valid_found"] += 1
-                            if name in by_source: by_source[name]["valid_found"] += 1
-                        else:
-                            stats["revoked_or_invalid"] += 1
-                            if name in by_source: by_source[name]["revoked_or_invalid"] += 1
+                        stats["valid_found"] += 1
+                        if name in by_source: by_source[name]["valid_found"] += 1
 
                         reason = ""
                         if res.get("isSoftbanned"): reason = f" [{res.get('softbanReason', 'Softbanned')}]"
-                        elif not res.get("certValid"): reason = " [Cert Expired/Invalid]"
-                        elif not res.get("chainValid"): reason = " [Chain Invalid]"
-                        elif res.get("privateKeyMatch") is False: reason = " [Private Key Mismatch]"
 
                         if existing:
                             stats["skipped_existing"] += 1
@@ -1375,29 +1390,39 @@ def api_recheck_keyboxes_pool():
 
 @app.post("/api/keybox/check")
 def api_check_keybox(req: KeyboxCheckRequest):
-    """Parses, validates, and stores a keybox XML to the active database pool."""
+    """Parses, validates, and stores a keybox XML to the active database pool if valid."""
     try:
         res = validate_keybox_xml(req.xml_content)
         status_str = res.get("status", "INVALID")
         serial = res.get("serialNumber", "unknown")
-        is_valid = status_str in ["STRONG", "SOFTBAN"]
+        is_revoked = res.get("revoked", False) or status_str == "REVOKED"
+        is_valid = status_str in ["STRONG", "SOFTBAN"] and not is_revoked
         saved, is_duplicate, duplicate_warning = False, False, None
 
-        try:
-            now_str = get_now_iso()
-            existing = db.keyboxes.find_one({"serial_number": serial})
-            if existing:
-                is_duplicate = True
-                first_added = existing.get("created_at") or "previously"
-                duplicate_warning = f"Duplicate Keybox: Serial '{serial}' is already present in your pool (First added: {first_added}). Status has been updated."
-                if existing.get("device_id"):
-                    res["deviceId"] = existing.get("device_id")
+        if is_valid:
+            try:
+                now_str = get_now_iso()
+                existing = db.keyboxes.find_one({"serial_number": serial})
+                if existing:
+                    is_duplicate = True
+                    first_added = existing.get("created_at") or "previously"
+                    duplicate_warning = f"Duplicate Keybox: Serial '{serial}' is already present in your pool (First added: {first_added}). Status has been updated."
+                    if existing.get("device_id"):
+                        res["deviceId"] = existing.get("device_id")
 
-            doc = build_keybox_record(res, req.xml_content, now_str, "Web Verification", None, existing)
-            db.keyboxes.update_one({"serial_number": serial}, {"$set": doc}, upsert=True)
-            saved = True
-        except Exception as dbe:
-            logger.error(f"Failed to save keybox to database: {dbe}")
+                doc = build_keybox_record(res, req.xml_content, now_str, "Web Verification", None, existing)
+                db.keyboxes.update_one({"serial_number": serial}, {"$set": doc}, upsert=True)
+                saved = True
+            except Exception as dbe:
+                logger.error(f"Failed to save keybox to database: {dbe}")
+        else:
+            # Revoked, invalid, or expired keyboxes are not saved to the keybox pool
+            try:
+                existing = db.keyboxes.find_one({"serial_number": serial})
+                if existing and existing.get("device_id"):
+                    res["deviceId"] = existing.get("device_id")
+            except Exception:
+                pass
 
         res["isDuplicate"] = is_duplicate
         res["duplicateWarning"] = duplicate_warning
@@ -1424,13 +1449,14 @@ def api_get_keyboxes():
         # 1. Sort by created_at descending (latest added first)
         kbs.sort(key=lambda k: k.get("created_at") or "", reverse=True)
 
-        # 2. Stable sort by status hierarchy: STRONG (0) -> SOFTBAN/VALID (1) -> REVOKED (2) -> INVALID/Other (3)
+        # 2. Stable sort by status hierarchy: STRONG (0) -> SOFTBAN/VALID (1) -> REVOKED (2) -> EXPIRED (3) -> INVALID/Other (4)
         def status_rank(k):
             st = (k.get("status") or "").upper()
             if st == "STRONG": return 0
             if st in ["SOFTBAN", "VALID"]: return 1
             if st == "REVOKED": return 2
-            return 3
+            if st == "EXPIRED": return 3
+            return 4
 
         kbs.sort(key=status_rank)
 
@@ -1582,6 +1608,35 @@ def api_download_keybox_by_serial(serial_number: str):
         raise
     except Exception as e:
         logger.error(f"Error downloading keybox by serial {serial_number}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/keyboxes/{serial_number}/check")
+@app.get("/api/keyboxes/{serial_number}/details")
+def api_get_keybox_check_details(serial_number: str):
+    """Parses, verifies, and returns full real-time Keybox Check Details for a stored keybox."""
+    try:
+        kb = db.keyboxes.find_one({"serial_number": serial_number})
+        if not kb:
+            raise HTTPException(status_code=404, detail=f"Keybox with serial '{serial_number}' not found in pool.")
+        raw_xml = kb.get("xml_content", "")
+        if not raw_xml:
+            raise HTTPException(status_code=404, detail="Keybox XML content is empty.")
+
+        xml_content = decode_base64_xml(raw_xml)
+        res = validate_keybox_xml(xml_content)
+        if kb.get("device_id"):
+            res["deviceId"] = kb.get("device_id")
+
+        return {
+            "success": True,
+            "status": res.get("status", "INVALID"),
+            "result": res,
+            "keybox": serialize_doc(kb)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting check details for keybox {serial_number}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/api/keyboxes/{serial_number}")
