@@ -1,37 +1,53 @@
+# ============================================================
+#   STAGE 1: Build Go WS-SSH Multiplexer
+# ============================================================
+FROM golang:1.22-alpine AS builder
+
+WORKDIR /src
+COPY ws-ssh/main.go .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /ws-ssh-bin main.go
+
+# ============================================================
+#   STAGE 2: Final Runtime Container
+# ============================================================
 FROM ubuntu:22.04
 
-ARG DEBIAN_FRONTEND=noninteractive
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+ENV PORT=80
 
-# Update the package list and install packages including Python
-RUN apt-get -y update && apt-get install -y bash wget curl golang git ttyd nginx python3 python3-pip \
-    && apt-get -y autoremove && apt-get -y autoclean
+# Install required tools and SSH daemons
+RUN apt-get update -qq && \
+    apt-get install -y -qq --no-install-recommends \
+        openssh-server \
+        dropbear \
+        python3 \
+        python3-pip \
+        python3-flask \
+        procps \
+        curl \
+        jq \
+        net-tools \
+        passwd \
+        ca-certificates && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-RUN ARCH=$(uname -m) && \
-    if [ "$ARCH" = "x86_64" ]; then \
-        URL_ARCH="amd64"; \
-    elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
-        URL_ARCH="arm64"; \
-    else \
-        echo "Unsupported architecture: $ARCH" && exit 1; \
-    fi && \
-    wget https://github.com/alist-org/alist/releases/latest/download/alist-linux-$URL_ARCH.tar.gz && \
-    tar -xzvf alist*.tar.gz && \
-    rm -r alist*.tar.gz && \
-    # Download and extract Code-Server
-    wget https://github.com/coder/code-server/releases/download/v4.107.0/code-server-4.107.0-linux-$URL_ARCH.tar.gz && \
-    tar -xzf code-server*.tar.gz && \
-    cp -r code-server-4.107.0-linux-$URL_ARCH /usr/lib/code-server && \
-    ln -s /usr/lib/code-server/bin/code-server /bin/code-server && \
-    rm code-server*.tar.gz
+WORKDIR /app
 
-#RUN curl https://cli-assets.heroku.com/install.sh | sh
+# Copy Go binary
+COPY --from=builder /ws-ssh-bin /app/ws-ssh-bin
+RUN chmod +x /app/ws-ssh-bin
 
-RUN pip3 install requests python-dotenv
+# Copy Web Panel and Entrypoint
+COPY panel /app/panel
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
-COPY ./web/settings.json ./var/lib/code-server/User/settings.json
-COPY . .
-RUN mkdir -p /data/ && cp ./web/config.json /data/config.json
-RUN chmod +x ./script/nginx.sh ./script/alist.sh ./script/vs.sh ./script/ttyd.sh
+# Default SSH login banner
+RUN echo '<center><font color="blue"><b>🌐 RAILWAY SSH CLOUD SERVER 🌐</b></font><br><br><font color="green">🛡️ CONNECTED VIA WEBSOCKET</font></center>' > /etc/issue.net
 
-RUN go mod init webui && go build -o bin/webui
-CMD ["./bin/webui"]
+# Expose HTTP (80) and SSL (443) ports
+EXPOSE 80 443
+
+ENTRYPOINT ["/app/entrypoint.sh"]
