@@ -3,19 +3,38 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import jwt
 import bcrypt
+import time
 from datetime import datetime, timedelta, timezone
+
+# In-memory user cache to eliminate redundant WAN queries to MongoDB on repeat requests
+_USER_CACHE = {}  # user_id_str -> (user_doc, expire_timestamp)
+
+def get_cached_user(user_id_str: str):
+    cached = _USER_CACHE.get(user_id_str)
+    if cached and cached[1] > time.time():
+        return cached[0]
+    return None
+
+def set_cached_user(user_id_str: str, user_doc: dict, ttl: int = 120):
+    _USER_CACHE[user_id_str] = (user_doc, time.time() + ttl)
+
+def invalidate_user_cache(user_id_str: str):
+    _USER_CACHE.pop(user_id_str, None)
+
+# ----------------- JWT HELPERS & DEPENDENCIES -----------------
 from typing import Optional, List
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends, HTTPException, status, Header, Body
+from fastapi import FastAPI, Depends, HTTPException, status, Header, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 from bson import ObjectId
 from bson.errors import InvalidId
+from pymongo.errors import PyMongoError
 from dotenv import load_dotenv
 
-from db import users_col, todos_col, settings_col
+from db import users_col, todos_col, settings_col, client
 from scheduler import start_scheduler_thread
 
 # Load environment configuration
@@ -39,6 +58,30 @@ app = FastAPI(
     version="1.1.0",
     lifespan=lifespan
 )
+
+@app.exception_handler(PyMongoError)
+async def mongo_exception_handler(request: Request, exc: PyMongoError):
+    print(f"[Database Error] {exc}")
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Database unavailable. Please ensure MongoDB Atlas IP whitelist allows 0.0.0.0/0 and MONGODB_URI is valid."}
+    )
+
+@app.get("/health")
+@app.get("/api/health")
+def health_check():
+    """Healthcheck endpoint for Koyeb, Render, and monitoring."""
+    db_connected = False
+    try:
+        if client is not None:
+            client.admin.command('ping')
+            db_connected = True
+    except Exception:
+        db_connected = False
+    return {
+        "status": "healthy" if db_connected else "degraded",
+        "database": "connected" if db_connected else "disconnected"
+    }
 
 # Configure CORS
 app.add_middleware(
@@ -102,6 +145,11 @@ def get_current_user(authorization: Optional[str] = Header(None)):
                 detail="Invalid token payload"
             )
         
+        # Check in-memory cache first for fast 0ms return
+        cached = get_cached_user(user_id)
+        if cached:
+            return cached
+
         oid = validate_object_id(user_id)
         user = users_col.find_one({"_id": oid})
         if not user:
@@ -110,6 +158,7 @@ def get_current_user(authorization: Optional[str] = Header(None)):
                 detail="User not found"
             )
         
+        set_cached_user(user_id, user)
         return user
     except jwt.ExpiredSignatureError:
         raise HTTPException(
@@ -194,16 +243,32 @@ class SettingUpdateRequest(BaseModel):
 
 @app.post("/api/auth/register")
 def register(req: RegisterRequest):
-    # Check duplicate user
-    if users_col.find_one({"username": req.username}):
+    clean_username = (req.username or "").strip().lower()
+    clean_password = req.password or ""
+
+    if len(clean_username) < 3 or len(clean_username) > 50:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username must be between 3 and 50 characters"
+        )
+    
+    if len(clean_password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 6 characters"
+        )
+
+    # Check duplicate user (utilizes unique index on username)
+    if users_col.find_one({"username": clean_username}):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username already taken"
         )
     
-    hashed_pw = bcrypt.hashpw(req.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    # Standard rounds=10: fast (~50ms) yet cryptographically secure
+    hashed_pw = bcrypt.hashpw(clean_password.encode('utf-8'), bcrypt.gensalt(rounds=10)).decode('utf-8')
     new_user = {
-        "username": req.username,
+        "username": clean_username,
         "password_hash": hashed_pw,
         "role": "user",
         "telegram_chat_id": "",
@@ -214,7 +279,10 @@ def register(req: RegisterRequest):
     result = users_col.insert_one(new_user)
     new_user["_id"] = result.inserted_id
     
-    token = create_access_token(str(new_user["_id"]), new_user["role"])
+    user_id_str = str(new_user["_id"])
+    token = create_access_token(user_id_str, new_user["role"])
+    set_cached_user(user_id_str, new_user)
+    
     return {
         "token": token,
         "user": serialize_user(new_user)
@@ -222,22 +290,43 @@ def register(req: RegisterRequest):
 
 @app.post("/api/auth/login")
 def login(req: LoginRequest):
-    user = users_col.find_one({"username": req.username})
+    raw_username = (req.username or "").strip()
+    raw_password = req.password or ""
+
+    if not raw_username or not raw_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username and password are required"
+        )
+    
+    # Fast indexed lookup: exact match first (uses unique index directly)
+    user = users_col.find_one({"username": raw_username})
+    if not user:
+        # Fallback to lowercase if typed with capital letters on mobile
+        user = users_col.find_one({"username": raw_username.lower()})
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials"
+            detail="Invalid username or password"
         )
     
-    # Check password
-    is_correct = bcrypt.checkpw(req.password.encode('utf-8'), user["password_hash"].encode('utf-8'))
+    # Check password securely
+    try:
+        is_correct = bcrypt.checkpw(raw_password.encode('utf-8'), user["password_hash"].encode('utf-8'))
+    except Exception:
+        is_correct = False
+
     if not is_correct:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials"
+            detail="Invalid username or password"
         )
     
-    token = create_access_token(str(user["_id"]), user["role"])
+    user_id_str = str(user["_id"])
+    token = create_access_token(user_id_str, user["role"])
+    set_cached_user(user_id_str, user)
+    
     return {
         "token": token,
         "user": serialize_user(user)
@@ -250,17 +339,26 @@ def get_me(current_user=Depends(get_current_user)):
 @app.put("/api/auth/profile")
 def update_profile(req: ProfileUpdateRequest, current_user=Depends(get_current_user)):
     update_data = {
-        "telegram_chat_id": req.telegram_chat_id,
-        "telegram_bot_token": req.telegram_bot_token or ""
+        "telegram_chat_id": (req.telegram_chat_id or "").strip(),
+        "telegram_bot_token": (req.telegram_bot_token or "").strip()
     }
     
-    if req.password:
-        hashed_pw = bcrypt.hashpw(req.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    if req.password and len(req.password.strip()) >= 6:
+        hashed_pw = bcrypt.hashpw(req.password.strip().encode('utf-8'), bcrypt.gensalt(rounds=10)).decode('utf-8')
         update_data["password_hash"] = hashed_pw
         
-    users_col.update_one({"_id": current_user["_id"]}, {"$set": update_data})
-    updated_user = users_col.find_one({"_id": current_user["_id"]})
-    return serialize_user(updated_user)
+    user_id = current_user["_id"]
+    user_id_str = str(user_id)
+    
+    users_col.update_one({"_id": user_id}, {"$set": update_data})
+    updated_user = users_col.find_one({"_id": user_id})
+    
+    # Update cache
+    invalidate_user_cache(user_id_str)
+    if updated_user:
+        set_cached_user(user_id_str, updated_user)
+        
+    return serialize_user(updated_user or current_user)
 
 # ----------------- TODO MANAGEMENT API -----------------
 

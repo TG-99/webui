@@ -27,28 +27,48 @@ except Exception:
 client = None
 db = None
 try:
-    client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=8000)
+    client_kwargs = {
+        "serverSelectionTimeoutMS": 5000,
+        "connectTimeoutMS": 5000,
+        "socketTimeoutMS": 10000,
+        "maxPoolSize": 50,
+        "minPoolSize": 5,
+        "retryWrites": True
+    }
+    try:
+        import certifi
+        client_kwargs["tlsCAFile"] = certifi.where()
+    except Exception:
+        pass
+
+    client = MongoClient(MONGODB_URI, **client_kwargs)
     db = client.get_database(db_name)
-    # Force check of connection status
+    # Check connection status
     client.server_info()
     print(f"Successfully connected to MongoDB database: '{db_name}'!")
 except Exception as e:
     print(f"Error connecting to MongoDB: {e}")
-    print("Please make sure MongoDB is running locally or MONGODB_URI is correctly configured in .env.")
+    print("Please make sure MongoDB is running locally or MONGODB_URI is correctly configured in .env / cloud platform.")
     if client is not None:
         db = client.get_database(db_name)
-
-
+    else:
+        try:
+            client = MongoClient(MONGODB_URI)
+            db = client.get_database(db_name)
+        except Exception:
+            pass
 
 # Collections
 users_col = db["users"]
 todos_col = db["todos"]
 settings_col = db["settings"]
 
-# Setup unique indexes
+# Setup high-performance indexes
 try:
-    users_col.create_index("username", unique=True)
-    settings_col.create_index("key", unique=True)
+    users_col.create_index("username", unique=True, background=True)
+    todos_col.create_index([("user_id", 1), ("deadline", 1)], background=True)
+    todos_col.create_index("completed", background=True)
+    settings_col.create_index("key", unique=True, background=True)
 except Exception as e:
     print(f"Index creation warning: {e}")
 

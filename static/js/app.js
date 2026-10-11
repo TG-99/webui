@@ -8,7 +8,7 @@ let state = {
     token: localStorage.getItem("mustdo_token") || null,
     user: null,
     todos: [],
-    filter: "all",
+    filter: "active",
     searchQuery: "",
     theme: localStorage.getItem("mustdo_theme") || "system",
     selectedTodoIds: [],
@@ -62,47 +62,63 @@ async function checkAuthSession() {
             onLoginSuccess();
         } else {
             // Token expired or invalid
-            logout();
+            logout(false);
         }
     } catch (err) {
         console.error("Session verification error:", err);
-        showToast("Server offline. Using local session cached data.", "info");
-        // Fallback or show auth
         showView("auth");
+        showToast("Session expired or server offline. Please log in.", "info");
     }
 }
 
 function onLoginSuccess() {
     showView("dashboard");
-    document.getElementById("username-badge").textContent = state.user.username;
+    if (!state.user) return;
+    const username = state.user.username;
+
+    const badgeEl = document.getElementById("username-badge");
+    if (badgeEl) badgeEl.textContent = username;
+
+    const avatarEl = document.getElementById("user-avatar-initial");
+    if (avatarEl) avatarEl.textContent = username.charAt(0).toUpperCase();
+
+    const heroGreeting = document.getElementById("hero-greeting");
+    if (heroGreeting) heroGreeting.textContent = `Hello, ${username}! 👋`;
 
     // Show Admin Button if user is admin
     const adminBtn = document.getElementById("admin-panel-btn");
-    if (state.user.role === "admin") {
-        adminBtn.classList.remove("hidden");
-    } else {
-        adminBtn.classList.add("hidden");
+    if (adminBtn) {
+        if (state.user.role === "admin") {
+            adminBtn.classList.remove("hidden");
+        } else {
+            adminBtn.classList.add("hidden");
+        }
     }
 
-    // Set chat ID and bot token in modal on load
-    document.getElementById("profile-chat-id").value = state.user.telegram_chat_id || "";
-    document.getElementById("profile-bot-token").value = state.user.telegram_bot_token || "";
+    // Set chat ID and bot token in profile modal
+    const chatIdInput = document.getElementById("profile-chat-id");
+    if (chatIdInput) chatIdInput.value = state.user.telegram_chat_id || "";
+    const botTokenInput = document.getElementById("profile-bot-token");
+    if (botTokenInput) botTokenInput.value = state.user.telegram_bot_token || "";
 
     // Set toggle checkbox state
-    document.getElementById("show-next-notification-toggle").checked = state.showNextNotification;
+    const nextNotifyToggle = document.getElementById("show-next-notification-toggle");
+    if (nextNotifyToggle) nextNotifyToggle.checked = state.showNextNotification;
 
     loadTodos();
 }
 
-function logout() {
+function logout(showFeedback = true) {
     localStorage.removeItem("mustdo_token");
     state.token = null;
     state.user = null;
     state.todos = [];
     state.selectedTodoIds = [];
-    updateExportButtonText();
+    resetAuthForms();
     showView("auth");
-    showToast("Logged out successfully", "success");
+    if (showFeedback) {
+        showToast("Logged out successfully", "success");
+    }
 }
 
 // ==========================================================================
@@ -135,11 +151,19 @@ function resetAuthForms() {
 function showLoginForm() {
     document.getElementById("login-form").classList.remove("hidden");
     document.getElementById("register-form").classList.add("hidden");
+    const tabLogin = document.getElementById("auth-tab-login");
+    const tabReg = document.getElementById("auth-tab-register");
+    if (tabLogin) tabLogin.classList.add("active");
+    if (tabReg) tabReg.classList.remove("active");
 }
 
 function showRegisterForm() {
     document.getElementById("login-form").classList.add("hidden");
     document.getElementById("register-form").classList.remove("hidden");
+    const tabLogin = document.getElementById("auth-tab-login");
+    const tabReg = document.getElementById("auth-tab-register");
+    if (tabLogin) tabLogin.classList.remove("active");
+    if (tabReg) tabReg.classList.add("active");
 }
 
 // ==========================================================================
@@ -191,6 +215,10 @@ function setupEventListeners() {
     // Auth Forms Switchers
     document.getElementById("to-register").addEventListener("click", showRegisterForm);
     document.getElementById("to-login").addEventListener("click", showLoginForm);
+    const tabLogin = document.getElementById("auth-tab-login");
+    const tabReg = document.getElementById("auth-tab-register");
+    if (tabLogin) tabLogin.addEventListener("click", showLoginForm);
+    if (tabReg) tabReg.addEventListener("click", showRegisterForm);
 
     // Auth Form Submits
     document.getElementById("login-form").addEventListener("submit", handleLogin);
@@ -295,8 +323,24 @@ function setupEventListeners() {
 
 async function handleLogin(e) {
     e.preventDefault();
-    const username = document.getElementById("login-username").value;
-    const password = document.getElementById("login-password").value;
+    const usernameInput = document.getElementById("login-username");
+    const passwordInput = document.getElementById("login-password");
+    const submitBtn = document.getElementById("login-submit-btn");
+
+    const username = (usernameInput ? usernameInput.value : "").trim();
+    const password = passwordInput ? passwordInput.value : "";
+
+    if (!username || !password) {
+        showToast("Please enter both username and password", "warning");
+        return;
+    }
+
+    // Set UI loading state & prevent duplicate submission
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.dataset.originalText = submitBtn.textContent;
+        submitBtn.textContent = "Signing In...";
+    }
 
     try {
         const response = await fetch(`${API_BASE}/api/auth/login`, {
@@ -305,26 +349,59 @@ async function handleLogin(e) {
             body: JSON.stringify({ username, password })
         });
 
-        const data = await response.json();
+        let data = {};
+        try {
+            data = await response.json();
+        } catch (_) {
+            data = { detail: `Server response error (${response.status} ${response.statusText || 'Gateway Error'})` };
+        }
+
         if (response.ok) {
             state.token = data.token;
             state.user = data.user;
             localStorage.setItem("mustdo_token", data.token);
+            resetAuthForms();
             onLoginSuccess();
             showToast(`Welcome back, ${data.user.username}!`, "success");
         } else {
-            showToast(data.detail || "Invalid login credentials", "error");
+            showToast(data.detail || "Invalid username or password", "error");
         }
     } catch (err) {
         console.error("Login Error:", err);
-        showToast("Failed to connect to backend server.", "error");
+        showToast("Unable to reach server. Please verify your connection or service status.", "error");
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = submitBtn.dataset.originalText || "Log In";
+        }
     }
 }
 
 async function handleRegister(e) {
     e.preventDefault();
-    const username = document.getElementById("register-username").value;
-    const password = document.getElementById("register-password").value;
+    const usernameInput = document.getElementById("register-username");
+    const passwordInput = document.getElementById("register-password");
+    const submitBtn = document.getElementById("register-submit-btn");
+
+    const username = (usernameInput ? usernameInput.value : "").trim().toLowerCase();
+    const password = passwordInput ? passwordInput.value : "";
+
+    if (!username || username.length < 3) {
+        showToast("Username must be at least 3 characters", "warning");
+        return;
+    }
+
+    if (!password || password.length < 6) {
+        showToast("Password must be at least 6 characters", "warning");
+        return;
+    }
+
+    // Set UI loading state & prevent duplicate submission
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.dataset.originalText = submitBtn.textContent;
+        submitBtn.textContent = "Creating Account...";
+    }
 
     try {
         const response = await fetch(`${API_BASE}/api/auth/register`, {
@@ -333,19 +410,31 @@ async function handleRegister(e) {
             body: JSON.stringify({ username, password })
         });
 
-        const data = await response.json();
+        let data = {};
+        try {
+            data = await response.json();
+        } catch (_) {
+            data = { detail: `Server response error (${response.status} ${response.statusText || 'Gateway Error'})` };
+        }
+
         if (response.ok) {
             state.token = data.token;
             state.user = data.user;
             localStorage.setItem("mustdo_token", data.token);
+            resetAuthForms();
             onLoginSuccess();
-            showToast(`Account created successfully!`, "success");
+            showToast("Account created successfully! Welcome!", "success");
         } else {
             showToast(data.detail || "Registration failed. Username might be taken.", "error");
         }
     } catch (err) {
         console.error("Registration Error:", err);
-        showToast("Failed to connect to backend server.", "error");
+        showToast("Unable to reach server. Please verify your connection or service status.", "error");
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = submitBtn.dataset.originalText || "Create Account";
+        }
     }
 }
 
@@ -808,7 +897,7 @@ function renderTodos() {
         return true;
     });
 
-    // Update stats summaries
+    // Update stats summaries & hero banner
     calculateStats();
 
 
@@ -890,10 +979,55 @@ function calculateStats() {
         return !t.completed && deadline < now;
     }).length;
 
-    document.getElementById("stat-total").textContent = total;
-    document.getElementById("stat-pending").textContent = pending;
-    document.getElementById("stat-completed").textContent = completed;
-    document.getElementById("stat-overdue").textContent = overdue;
+    const totalEl = document.getElementById("stat-total");
+    const pendingEl = document.getElementById("stat-pending");
+    const completedEl = document.getElementById("stat-completed");
+    const overdueEl = document.getElementById("stat-overdue");
+
+    if (totalEl) totalEl.textContent = total;
+    if (pendingEl) pendingEl.textContent = pending;
+    if (completedEl) completedEl.textContent = completed;
+    if (overdueEl) overdueEl.textContent = overdue;
+
+    // Calculate percentage and update hero progress card (Go Task Behance Feature)
+    const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+    const barEl = document.getElementById("hero-progress-bar");
+    const percentEl = document.getElementById("hero-progress-percent");
+    const textEl = document.getElementById("hero-progress-text");
+    const msgEl = document.getElementById("hero-progress-message");
+    const badgeTextEl = document.getElementById("hero-badge-text");
+
+    if (barEl) barEl.style.width = `${percent}%`;
+    if (percentEl) percentEl.textContent = `${percent}%`;
+    if (textEl) textEl.textContent = `${completed} of ${total} tasks completed`;
+
+    if (msgEl) {
+        if (total === 0) {
+            msgEl.textContent = "No tasks yet. Create one with the '+' button to get started!";
+        } else if (completed === total) {
+            msgEl.textContent = "Outstanding work! All your tasks are completed! 🎉";
+        } else if (overdue > 0) {
+            msgEl.textContent = `You have ${overdue} overdue task${overdue > 1 ? 's' : ''}. Let's get back on track!`;
+        } else if (percent >= 75) {
+            msgEl.textContent = "Almost there! Finish the final few tasks to wrap up!";
+        } else if (percent >= 50) {
+            msgEl.textContent = "More than halfway done! Keep up the great pace!";
+        } else {
+            msgEl.textContent = `You have ${pending} tasks remaining. Let's make progress!`;
+        }
+    }
+
+    if (badgeTextEl) {
+        if (total === 0) {
+            badgeTextEl.textContent = "Ready";
+        } else if (completed === total) {
+            badgeTextEl.textContent = "All Done 🎉";
+        } else if (overdue > 0) {
+            badgeTextEl.textContent = "Attention Needed";
+        } else {
+            badgeTextEl.textContent = "In Progress";
+        }
+    }
 
     // Toggle active ringing bell on overdue icon if there are any overdue items
     const overdueIcon = document.querySelector(".icon-overdue");
@@ -925,9 +1059,9 @@ function formatRemainingTime(deadlineStr, isCompleted) {
 
         let timeStr = "";
         if (days > 0) timeStr += `${days}d `;
-        if (hrs > 0 || days > 0) timeStr += `${hrs}h `;
-        if (mins > 0 || hrs > 0 || days > 0) timeStr += `${mins}m `;
-        timeStr += `${secs}s`;
+        if (hrs > 0 || days > 0) timeStr += `${String(hrs).padStart(2, '0')}h `;
+        if (mins > 0 || hrs > 0 || days > 0) timeStr += `${String(mins).padStart(2, '0')}m `;
+        timeStr += `${String(secs).padStart(2, '0')}s`;
         return `⚠️ ${timeStr} Overdue`;
     } else {
         const totalSecs = Math.floor(diffMs / 1000);
@@ -972,9 +1106,9 @@ function tickCountdowns() {
 
             let timeStr = "";
             if (days > 0) timeStr += `${days}d `;
-            if (hrs > 0 || days > 0) timeStr += `${hrs}h `;
-            if (mins > 0 || hrs > 0 || days > 0) timeStr += `${mins}m `;
-            timeStr += `${secs}s`;
+            if (hrs > 0 || days > 0) timeStr += `${String(hrs).padStart(2, '0')}h `;
+            if (mins > 0 || hrs > 0 || days > 0) timeStr += `${String(mins).padStart(2, '0')}m `;
+            timeStr += `${String(secs).padStart(2, '0')}s`;
 
             countdownTextEl.textContent = `⚠️ ${timeStr} Overdue`;
             el.classList.add("badge-overdue");
