@@ -16,7 +16,6 @@ let state = {
 };
 
 let _countdownInterval = null;
-let _autoRefreshInterval = null;
 let _toastQueue = [];
 let _toastActive = false;
 
@@ -33,11 +32,6 @@ document.addEventListener("DOMContentLoaded", () => {
     _countdownInterval = setInterval(() => {
         tickCountdowns();
     }, 1000);
-
-    // Auto-refresh todos from server every 60s
-    _autoRefreshInterval = setInterval(() => {
-        if (state.token && state.user) loadTodos();
-    }, 60000);
 });
 
 // ==========================================================================
